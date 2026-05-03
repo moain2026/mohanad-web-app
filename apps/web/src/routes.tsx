@@ -26,6 +26,28 @@ const AccountPage = lazy(() =>
   import('./pages/AccountPage').then((m) => ({ default: m.AccountPage })),
 );
 
+// Phase 3 — Customers
+const CustomersListPage = lazy(() =>
+  import('./pages/customers/CustomersListPage').then((m) => ({ default: m.CustomersListPage })),
+);
+const CustomerDetailPage = lazy(() =>
+  import('./pages/customers/CustomerDetailPage').then((m) => ({ default: m.CustomerDetailPage })),
+);
+const NewCustomerPage = lazy(() =>
+  import('./pages/customers/NewCustomerPage').then((m) => ({ default: m.NewCustomerPage })),
+);
+const EditCustomerPage = lazy(() =>
+  import('./pages/customers/EditCustomerPage').then((m) => ({ default: m.EditCustomerPage })),
+);
+const CustomerStatementPage = lazy(() =>
+  import('./pages/customers/CustomerStatementPage').then((m) => ({
+    default: m.CustomerStatementPage,
+  })),
+);
+const NotificationsPage = lazy(() =>
+  import('./pages/notifications/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
+);
+
 /**
  * Application routes (React Router v5 — Q4 keeps v5 due to Ionic 8 lock).
  *
@@ -71,6 +93,46 @@ export function AppRoutes(): JSX.Element {
 
       {/* Account */}
       <ProtectedRoute exact path="/account" component={AccountPage} />
+
+      {/* Phase 3 — Customers */}
+      <ProtectedRoute
+        exact
+        path="/customers"
+        component={CustomersListPage}
+        permission="customers.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/customers/new"
+        component={NewCustomerPage}
+        permission="customers.create"
+      />
+      <ProtectedRoute
+        exact
+        path="/customers/:id"
+        component={CustomerDetailPage}
+        permission="customers.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/customers/:id/edit"
+        component={EditCustomerPage}
+        permission="customers.update"
+      />
+      <ProtectedRoute
+        exact
+        path="/customers/:id/statement"
+        component={CustomerStatementPage}
+        permission="customers.view_transactions"
+      />
+
+      {/* Phase 3 — Notifications */}
+      <ProtectedRoute
+        exact
+        path="/notifications"
+        component={NotificationsPage}
+        permission="notifications.view_own"
+      />
 
       <Route component={NotFoundPage} />
     </Switch>
