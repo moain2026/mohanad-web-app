@@ -101,8 +101,10 @@ async function main() {
       // Pre-fill some fields so the modal looks alive.
       await page.evaluate(() => {
         const setVal = (el, value) => {
-          const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
-            ?.set;
+          const setter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype,
+            'value',
+          )?.set;
           setter?.call(el, value);
           el.dispatchEvent(new Event('input', { bubbles: true }));
         };
