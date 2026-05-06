@@ -12,7 +12,9 @@ export * from './auth';
 export * from './common';
 export * from './customers';
 export * from './notifications';
+export * from './purchases';
 export * from './roles';
+export * from './suppliers';
 export * from './users';
 
 // ─── Money (legacy — تستخدم في الفرونت) ──────────

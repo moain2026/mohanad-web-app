@@ -48,6 +48,36 @@ const NotificationsPage = lazy(() =>
   import('./pages/notifications/NotificationsPage').then((m) => ({ default: m.NotificationsPage })),
 );
 
+// Phase 4 — Suppliers
+const SuppliersListPage = lazy(() =>
+  import('./pages/suppliers/SuppliersListPage').then((m) => ({ default: m.SuppliersListPage })),
+);
+const NewSupplierPage = lazy(() =>
+  import('./pages/suppliers/NewSupplierPage').then((m) => ({ default: m.NewSupplierPage })),
+);
+const EditSupplierPage = lazy(() =>
+  import('./pages/suppliers/EditSupplierPage').then((m) => ({ default: m.EditSupplierPage })),
+);
+const SupplierDetailPage = lazy(() =>
+  import('./pages/suppliers/SupplierDetailPage').then((m) => ({ default: m.SupplierDetailPage })),
+);
+const SupplierStatementPage = lazy(() =>
+  import('./pages/suppliers/SupplierStatementPage').then((m) => ({
+    default: m.SupplierStatementPage,
+  })),
+);
+
+// Phase 4 — Purchases
+const PurchasesListPage = lazy(() =>
+  import('./pages/purchases/PurchasesListPage').then((m) => ({ default: m.PurchasesListPage })),
+);
+const NewPurchasePage = lazy(() =>
+  import('./pages/purchases/NewPurchasePage').then((m) => ({ default: m.NewPurchasePage })),
+);
+const PurchaseDetailPage = lazy(() =>
+  import('./pages/purchases/PurchaseDetailPage').then((m) => ({ default: m.PurchaseDetailPage })),
+);
+
 /**
  * Application routes (React Router v5 — Q4 keeps v5 due to Ionic 8 lock).
  *
@@ -132,6 +162,58 @@ export function AppRoutes(): JSX.Element {
         path="/notifications"
         component={NotificationsPage}
         permission="notifications.view_own"
+      />
+
+      {/* Phase 4 — Suppliers */}
+      <ProtectedRoute
+        exact
+        path="/suppliers"
+        component={SuppliersListPage}
+        permission="suppliers.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/suppliers/new"
+        component={NewSupplierPage}
+        permission="suppliers.create"
+      />
+      <ProtectedRoute
+        exact
+        path="/suppliers/:id"
+        component={SupplierDetailPage}
+        permission="suppliers.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/suppliers/:id/edit"
+        component={EditSupplierPage}
+        permission="suppliers.update"
+      />
+      <ProtectedRoute
+        exact
+        path="/suppliers/:id/statement"
+        component={SupplierStatementPage}
+        permission="suppliers.view_transactions"
+      />
+
+      {/* Phase 4 — Purchases */}
+      <ProtectedRoute
+        exact
+        path="/purchases"
+        component={PurchasesListPage}
+        permission="purchases.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/purchases/new"
+        component={NewPurchasePage}
+        permission="purchases.create"
+      />
+      <ProtectedRoute
+        exact
+        path="/purchases/:id"
+        component={PurchaseDetailPage}
+        permission="purchases.view"
       />
 
       <Route component={NotFoundPage} />

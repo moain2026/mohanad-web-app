@@ -16,7 +16,9 @@ import { HealthModule } from './modules/health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -90,6 +92,10 @@ import { UsersModule } from './modules/users/users.module';
     // ─── Phase 3 ────────────────────────────────
     CustomersModule,
     NotificationsModule,
+
+    // ─── Phase 4 ────────────────────────────────
+    SuppliersModule,
+    PurchasesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

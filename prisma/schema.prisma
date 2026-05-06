@@ -49,6 +49,8 @@ model Store {
   auditLogs     AuditLog[]
   customers     Customer[]
   notifications Notification[]
+  suppliers     Supplier[]
+  purchases     Purchase[]
 
   @@map("stores")
 }
@@ -103,6 +105,13 @@ model User {
   transactionsCreated   CustomerTransaction[] @relation("TxCreatedBy")
   transactionsCancelled CustomerTransaction[] @relation("TxCancelledBy")
   notifications         Notification[]
+
+  // Phase 4 relations
+  suppliersCreated         Supplier[]            @relation("SupplierCreatedBy")
+  supplierTxCreated        SupplierTransaction[] @relation("SupplierTxCreatedBy")
+  supplierTxCancelled      SupplierTransaction[] @relation("SupplierTxCancelledBy")
+  purchasesCreated         Purchase[]            @relation("PurchaseCreatedBy")
+  purchasesCancelled       Purchase[]            @relation("PurchaseCancelledBy")
 
   @@index([storeId])
   @@index([isActive])
@@ -398,6 +407,182 @@ enum NotificationType {
   CUSTOMER_INACTIVE
   CUSTOMER_DEBT_HIGH
   // Additional types are added in later phases.
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SUPPLIERS — Phase 4 (P4-1)
+// ═══════════════════════════════════════════════════════════════
+
+/// A vendor that supplies goods to the store. Mirrors `Customer`
+/// but with inverted balance semantics:
+///   currentBalance > 0  → store OWES the supplier (unpaid credit purchases)
+///   currentBalance = 0  → settled
+///   currentBalance < 0  → store has overpaid / supplier owes us (credit)
+///
+/// All financial mutations go through `prisma.$transaction` with
+/// row-locking (`SELECT ... FOR UPDATE` semantics) to keep
+/// `currentBalance` consistent with the immutable transaction log.
+model Supplier {
+  id            String  @id @default(cuid())
+  storeId       String  @map("store_id")
+  name          String
+  phone         String?
+  whatsappPhone String? @map("whatsapp_phone")
+  address       String?
+
+  // Financial — Decimal(14,2) per docs/03 currency rules.
+  openingBalance Decimal @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  currentBalance Decimal @default(0) @map("current_balance") @db.Decimal(14, 2)
+
+  // Lifecycle
+  isActive Boolean @default(true) @map("is_active")
+
+  // Metadata
+  notes       String?
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  store        Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy    User                  @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  transactions SupplierTransaction[]
+  purchases    Purchase[]
+
+  @@index([storeId])
+  @@index([isActive])
+  @@index([phone])
+  @@index([deletedAt])
+  @@map("suppliers")
+}
+
+/// Append-only ledger of supplier balance movements.
+/// `balanceBefore` / `balanceAfter` are snapshots of `Supplier.currentBalance`
+/// captured inside the same DB transaction that mutates the supplier row.
+///
+/// Type semantics:
+/// - OPENING: initial balance set at creation (one row per supplier max).
+/// - CREDIT_PURCHASE: created by `Purchase` with paymentType=CREDIT.
+///                    Increases supplier balance (we owe more).
+///                    `referenceType="purchase"`, `referenceId=Purchase.id`.
+/// - PAYMENT: store pays the supplier. Decreases supplier balance.
+/// - ADJUSTMENT: manual correction (positive or negative). Owner-only.
+model SupplierTransaction {
+  id            String                  @id @default(cuid())
+  supplierId    String                  @map("supplier_id")
+  type          SupplierTransactionType
+  amount        Decimal                 @db.Decimal(14, 2)
+  balanceBefore Decimal                 @map("balance_before") @db.Decimal(14, 2)
+  balanceAfter  Decimal                 @map("balance_after") @db.Decimal(14, 2)
+  notes         String?
+
+  // Cancellation (soft — original row preserved for audit)
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
+  // Reference to a Purchase row (for CREDIT_PURCHASE) or future entities.
+  referenceType String? @map("reference_type")
+  referenceId   String? @map("reference_id")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("SupplierTxCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?    @relation("SupplierTxCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  @@index([supplierId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([cancelledAt])
+  @@index([referenceType, referenceId])
+  @@map("supplier_transactions")
+}
+
+enum SupplierTransactionType {
+  OPENING
+  CREDIT_PURCHASE
+  PAYMENT
+  ADJUSTMENT
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PURCHASES — Phase 4 (P4-3)
+// ═══════════════════════════════════════════════════════════════
+
+/// A purchase recorded against a supplier.
+///
+/// Payment-type semantics (LOCKED — see docs/12-agent-memory.md):
+/// - CASH: records the purchase row only. NO `SupplierTransaction` created.
+///         NO change to `Supplier.currentBalance`. Cash-flow tracking is
+///         handled by Phase 5 (`Expense` of type `CASH_PURCHASE_LINK` may
+///         reference this row but creates no double ledger entry).
+/// - CREDIT: atomic — within ONE `prisma.$transaction` we
+///           (1) create this `Purchase` row,
+///           (2) create a `SupplierTransaction(CREDIT_PURCHASE)` row,
+///           (3) increase `Supplier.currentBalance` by `totalAmount`.
+///           Cancellation reverses (2) + (3) atomically.
+///
+/// `hasItems` is denormalised so list pages can show a "detailed" badge
+/// without a join. Item-level data lives in `PurchaseItem`. For Phase 4
+/// items are free-text (no Product link); Phase 9 will populate `productId`.
+model Purchase {
+  id            String           @id @default(cuid())
+  storeId       String           @map("store_id")
+  supplierId    String           @map("supplier_id")
+  paymentType   PurchasePaymentType @map("payment_type")
+  totalAmount   Decimal          @map("total_amount") @db.Decimal(14, 2)
+  notes         String?
+  hasItems      Boolean          @default(false) @map("has_items")
+
+  // Cancellation
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier    Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  createdBy   User           @relation("PurchaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?          @relation("PurchaseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  items       PurchaseItem[]
+
+  @@index([storeId])
+  @@index([supplierId])
+  @@index([paymentType])
+  @@index([createdAt])
+  @@index([cancelledAt])
+  @@map("purchases")
+}
+
+enum PurchasePaymentType {
+  CASH
+  CREDIT
+}
+
+/// Line item for a detailed `Purchase`.
+/// `productId` is reserved for Phase 9 (Inventory) — kept null until then.
+/// `name` is free-text so the system stays usable without inventory enabled.
+model PurchaseItem {
+  id         String  @id @default(cuid())
+  purchaseId String  @map("purchase_id")
+  productId  String? @map("product_id") // Phase 9 — Inventory
+  name       String
+  quantity   Decimal @db.Decimal(14, 2)
+  unitCost   Decimal @map("unit_cost") @db.Decimal(14, 2)
+  totalCost  Decimal @map("total_cost") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@map("purchase_items")
 }
 
 // ═══════════════════════════════════════════════════════════════
