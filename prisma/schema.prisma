@@ -52,6 +52,14 @@ model Store {
   suppliers     Supplier[]
   purchases     Purchase[]
 
+  // Phase 5 relations
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
+  dailyIncome       DailyIncome[]
+
+  // Phase 6 relations
+  sales Sale[]
+
   @@map("stores")
 }
 
@@ -107,11 +115,21 @@ model User {
   notifications         Notification[]
 
   // Phase 4 relations
-  suppliersCreated         Supplier[]            @relation("SupplierCreatedBy")
-  supplierTxCreated        SupplierTransaction[] @relation("SupplierTxCreatedBy")
-  supplierTxCancelled      SupplierTransaction[] @relation("SupplierTxCancelledBy")
-  purchasesCreated         Purchase[]            @relation("PurchaseCreatedBy")
-  purchasesCancelled       Purchase[]            @relation("PurchaseCancelledBy")
+  suppliersCreated    Supplier[]            @relation("SupplierCreatedBy")
+  supplierTxCreated   SupplierTransaction[] @relation("SupplierTxCreatedBy")
+  supplierTxCancelled SupplierTransaction[] @relation("SupplierTxCancelledBy")
+  purchasesCreated    Purchase[]            @relation("PurchaseCreatedBy")
+  purchasesCancelled  Purchase[]            @relation("PurchaseCancelledBy")
+
+  // Phase 5 relations
+  expenseCategoriesCreated ExpenseCategory[] @relation("ExpenseCategoryCreatedBy")
+  expensesCreated          Expense[]         @relation("ExpenseCreatedBy")
+  expensesCancelled        Expense[]         @relation("ExpenseCancelledBy")
+  dailyIncomeClosed        DailyIncome[]     @relation("DailyIncomeClosedBy")
+
+  // Phase 6 relations
+  salesCreated   Sale[] @relation("SaleCreatedBy")
+  salesCancelled Sale[] @relation("SaleCancelledBy")
 
   @@index([storeId])
   @@index([isActive])
@@ -300,6 +318,9 @@ model Customer {
   createdBy        User                      @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   transactions     CustomerTransaction[]
   reminderSettings CustomerReminderSettings?
+
+  // Phase 6 relations
+  sales Sale[]
 
   @@index([storeId])
   @@index([status])
@@ -528,13 +549,13 @@ enum SupplierTransactionType {
 /// without a join. Item-level data lives in `PurchaseItem`. For Phase 4
 /// items are free-text (no Product link); Phase 9 will populate `productId`.
 model Purchase {
-  id            String           @id @default(cuid())
-  storeId       String           @map("store_id")
-  supplierId    String           @map("supplier_id")
-  paymentType   PurchasePaymentType @map("payment_type")
-  totalAmount   Decimal          @map("total_amount") @db.Decimal(14, 2)
-  notes         String?
-  hasItems      Boolean          @default(false) @map("has_items")
+  id          String              @id @default(cuid())
+  storeId     String              @map("store_id")
+  supplierId  String              @map("supplier_id")
+  paymentType PurchasePaymentType @map("payment_type")
+  totalAmount Decimal             @map("total_amount") @db.Decimal(14, 2)
+  notes       String?
+  hasItems    Boolean             @default(false) @map("has_items")
 
   // Cancellation
   cancelledAt   DateTime? @map("cancelled_at")
@@ -583,6 +604,199 @@ model PurchaseItem {
   @@index([purchaseId])
   @@index([productId])
   @@map("purchase_items")
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPENSES & DAILY INCOME — Phase 5 (P5-1)
+// ═══════════════════════════════════════════════════════════════
+
+/// Category used to bucket expenses for reports.
+/// Soft-deletable; cannot be hard-deleted while expenses reference it.
+model ExpenseCategory {
+  id          String  @id @default(cuid())
+  storeId     String  @map("store_id")
+  name        String
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("ExpenseCategoryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  expenses  Expense[]
+
+  @@unique([storeId, name])
+  @@index([storeId])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("expense_categories")
+}
+
+/// Cash outflow with three semantic modes:
+///   • NORMAL              → free-form expense (utilities, salaries, etc.)
+///   • SUPPLIER_PAYMENT    → payment to a supplier. Atomically also creates
+///                            a SupplierTransaction(PAYMENT) and decreases
+///                            Supplier.currentBalance. The link is recorded
+///                            via referenceType='supplier_transaction'.
+///   • CASH_PURCHASE_LINK  → tags an existing cash Purchase as the source
+///                            so that reports can show the expense breakdown
+///                            without double-counting the cash outflow
+///                            (the Purchase row is the authoritative ledger).
+///                            referenceType='purchase', referenceId=Purchase.id.
+///
+/// Critical no-double-count rule (LOCKED in docs/12-agent-memory.md):
+///   When type=CASH_PURCHASE_LINK, daily-income summaries MUST skip the
+///   Expense row and read from purchases instead.
+model Expense {
+  id          String      @id @default(cuid())
+  storeId     String      @map("store_id")
+  categoryId  String      @map("category_id")
+  type        ExpenseType
+  amount      Decimal     @db.Decimal(14, 2)
+  description String
+  expenseDate DateTime    @default(now()) @map("expense_date") @db.Date
+
+  // Optional reference (set when type ≠ NORMAL).
+  referenceType String? @map("reference_type")
+  referenceId   String? @map("reference_id")
+
+  // Cancellation (soft) — preserves audit trail.
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy   User            @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?           @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  @@index([storeId, expenseDate])
+  @@index([categoryId])
+  @@index([type])
+  @@index([cancelledAt])
+  @@index([referenceType, referenceId])
+  @@map("expenses")
+}
+
+enum ExpenseType {
+  NORMAL
+  SUPPLIER_PAYMENT
+  CASH_PURCHASE_LINK
+}
+
+/// Per-day aggregate. ONE row per (storeId, date).
+///
+/// Aggregates are recomputed atomically on every relevant write (sale,
+/// expense, cash-purchase-link, supplier payment via SUPPLIER_PAYMENT
+/// expense). Once `closedAt` is set the row is immutable.
+///
+/// All amounts are derived (so a re-run gives the same values), but stored
+/// for fast list/print without re-aggregating historical days.
+model DailyIncome {
+  id               String    @id @default(cuid())
+  storeId          String    @map("store_id")
+  date             DateTime  @db.Date
+  openingCash      Decimal   @default(0) @map("opening_cash") @db.Decimal(14, 2)
+  cashSales        Decimal   @default(0) @map("cash_sales") @db.Decimal(14, 2)
+  creditSales      Decimal   @default(0) @map("credit_sales") @db.Decimal(14, 2)
+  customerPayments Decimal   @default(0) @map("customer_payments") @db.Decimal(14, 2)
+  cashPurchases    Decimal   @default(0) @map("cash_purchases") @db.Decimal(14, 2)
+  supplierPayments Decimal   @default(0) @map("supplier_payments") @db.Decimal(14, 2)
+  normalExpenses   Decimal   @default(0) @map("normal_expenses") @db.Decimal(14, 2)
+  /// closing = openingCash + cashSales + customerPayments
+  ///         − cashPurchases − supplierPayments − normalExpenses
+  closingCash      Decimal   @default(0) @map("closing_cash") @db.Decimal(14, 2)
+  notes            String?
+  closedAt         DateTime? @map("closed_at")
+  closedById       String?   @map("closed_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  closedBy User? @relation("DailyIncomeClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, date])
+  @@index([storeId, date])
+  @@index([closedAt])
+  @@map("daily_income")
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SALES — Phase 6 (P6-1)
+// ═══════════════════════════════════════════════════════════════
+
+/// Sale to a customer. Three modes (LOCKED in docs/12-agent-memory.md):
+///   • QUICK       → cash, no line items, just a total. Hits DailyIncome.
+///   • DETAILED    → cash, optional line items. Same financial effect as QUICK.
+///   • CREDIT      → customer required + credit-limit check + atomically
+///                    creates CustomerTransaction(DEBT) and increases the
+///                    customer's currentBalance.
+///
+/// Cancellation reverses all financial side effects atomically.
+model Sale {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  mode        SaleMode
+  customerId  String?  @map("customer_id") // required for CREDIT
+  totalAmount Decimal  @map("total_amount") @db.Decimal(14, 2)
+  notes       String?
+  hasItems    Boolean  @default(false) @map("has_items")
+
+  // Soft-cancel
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy   User       @relation("SaleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?      @relation("SaleCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  items       SaleItem[]
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([mode])
+  @@index([createdAt])
+  @@index([cancelledAt])
+  @@map("sales")
+}
+
+enum SaleMode {
+  QUICK
+  DETAILED
+  CREDIT
+}
+
+/// Line item for a DETAILED or CREDIT sale (optional for both).
+/// `productId` is reserved for Phase 9 (Inventory).
+model SaleItem {
+  id         String  @id @default(cuid())
+  saleId     String  @map("sale_id")
+  productId  String? @map("product_id")
+  name       String
+  quantity   Decimal @db.Decimal(14, 2)
+  unitPrice  Decimal @map("unit_price") @db.Decimal(14, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
 }
 
 // ═══════════════════════════════════════════════════════════════
