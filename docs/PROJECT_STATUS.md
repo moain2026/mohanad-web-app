@@ -329,12 +329,13 @@ This is intentional — the seed assigns them to roles in advance.
 
 ## Maintenance gaps closed in the current PR
 
-| Gap                                                                          | Fix                                                                                  |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Bottom-nav / Sidebar did not expose `/notifications`                         | `BottomNav` + `Sidebar` updated; tests added                                         |
-| `AuditLog` table existed but no module wrote to it                           | `writeAuditLog` helper wired into customer / supplier / purchase services            |
-| `/account` lacked an active-sessions list                                    | `GET /auth/sessions` + `POST /auth/sessions/:id/revoke` + `<SessionsList />`         |
-| No GC for `IdempotencyKey` rows                                              | `purge:idempotency` CLI + `IdempotencyCleanerService` ready for Phase-8 cron        |
+| Gap                                                                          | Status        | Fix                                                                                  |
+| ---------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------ |
+| Status docs (`PROJECT_STATUS.md`, `AGENT_HANDOFF.md`) were pre-Phase-4 stale | ✅ done       | Refreshed to reflect 18 models, 3 migrations, 336+ tests, Phase 4 ✅                 |
+| Bottom-nav / Sidebar did not expose `/notifications`                         | ✅ done       | `BottomNav` + `Sidebar` updated; +7 nav-visibility tests                              |
+| AuditLog rows used drift-prone inline shapes across services                 | ✅ done       | `writeAuditLog` helper introduced + purchases/suppliers refactored; +6 helper tests   |
+| `/account` lacked an active-sessions list (no `GET /auth/sessions`)          | ⏭️ deferred   | Tracked in `docs/MASTER_PLAN.md` § Task 4 — separate PR for scope clarity            |
+| No GC for `IdempotencyKey` rows (24-h TTL accumulates forever)               | ⏭️ deferred   | Tracked in `docs/MASTER_PLAN.md` § Task 5 — combine with Phase-8 cron                |
 
 ---
 

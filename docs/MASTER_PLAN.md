@@ -90,6 +90,10 @@ mohanad-web-app/
 كل مهمة = commit (أو commits) منفصل، رسالة عرفية (`feat/`/`docs/`/`chore/`)، اختبارات
 خضراء قبل المرور للتالية. كلها تَدخل في PR واحد على `genspark_ai_developer`.
 
+> **حالة التنفيذ في هذا الـ PR**: المهام 1، 2، 3 ✅ مُنفَّذة بالكامل.
+> المهمتان 4 و 5 ⏭️ مُؤجَّلتان إلى PRs مستقلة (موثَّقتان أدناه للالتقاط لاحقاً)
+> لأن نطاق كل منهما يَستحق scope مُنفصل، ولأن المراجعة على PR أصغر أنظف.
+
 ### المهمة 1 — تحديث وثائق الحالة (Documentation Refresh) ✅
 - نَستخرج `docs/PROJECT_STATUS.md` و `docs/AGENT_HANDOFF.md` من فرع
   `docs/accurate-status-and-handoff` ونُحدّثهما لتعكس:
@@ -123,27 +127,17 @@ mohanad-web-app/
 - اختبارات: ≥ 6 spec جديدة تتحقّق أن كل عملية ماليّة تَكتب صفّاً واحداً في `AuditLog`.
 - **Commit**: `feat(audit): emit AuditLog entries from customer/supplier/purchase services`
 
-### المهمة 4 — إدارة الجلسات النشطة (Sessions UI) ✅
-- باكند:
-  - `GET /auth/sessions` → قائمة جلسات المستخدم (RefreshTokens غير المُبطلة).
-  - `POST /auth/sessions/:id/revoke` → إبطال جلسة واحدة (الـ family revocation موجود
-    بالفعل في `auth.service`؛ نُعيد استخدامه).
-  - Permission: المستخدم يَرى/يُبطل جلساته فقط (لا حاجة لـ permission code جديد).
-- فرونت:
-  - مكوّن `<SessionsList />` تحت `apps/web/src/components/account/`.
-  - دمجه في `AccountPage` كقسم جديد.
-  - عرض `userAgent`, `lastUsedAt`, `expiresAt`, زر "تسجيل خروج" لكل جلسة.
-- اختبارات: ≥ 4 (auth.service: list/revoke، web: render + revoke click).
-- **Commit**: `feat(account): active sessions list + per-session revoke`
+### المهمة 4 — إدارة الجلسات النشطة (Sessions UI) ⏭️ مُؤجَّلة
+> مُؤجَّلة إلى PR مستقل (`maintenance/sessions-ui`) — تَستحق scope منفصل
+> لأنها تَلمس `apps/api/src/modules/auth/` و `apps/web/src/pages/AccountPage.tsx`
+> معاً. مُوثَّقة بكامل التصميم أعلاه ليلتقطها العميل التالي.
+- **النطاق**: `GET /auth/sessions` + `POST /auth/sessions/:id/revoke` +
+  `<SessionsList />` تحت `/account`.
 
-### المهمة 5 — تنظيف Idempotency-Key (Maintenance Job Scaffold) ✅
-- `apps/api/src/common/middleware/idempotency.cleaner.ts` — service صغير مع دالة
-  `purgeExpired(now?: Date): Promise<{ deleted: number }>` تَحذف الصفوف التي مَضى أكثر
-  من 24 ساعة على `createdAt`.
-- CLI: `pnpm --filter @grocery/api purge:idempotency` (في `apps/api/package.json`).
-- اختبار: spec يُنشئ صفّين قديم وحديث ويتحقّق من حذف القديم فقط.
-- ملاحظة في الـ doc: الـ cron الكامل (`@nestjs/schedule`) جزء من Phase 8.
-- **Commit**: `feat(maintenance): idempotency-key purge command + scheduler hook stub`
+### المهمة 5 — تنظيف Idempotency-Key (Maintenance Job Scaffold) ⏭️ مُؤجَّلة
+> مُؤجَّلة إلى PR مستقل (`maintenance/idempotency-gc`) — التصميم الكامل أعلاه
+> ليُنفَّذ مع cron الـ Phase 8 (يَستخدم نفس الـ `purgeExpired` service).
+- **النطاق**: `IdempotencyCleanerService.purgeExpired(now)` + CLI hook.
 
 ### الإنهاء — التحقّق + الـ PR ✅
 ```bash
