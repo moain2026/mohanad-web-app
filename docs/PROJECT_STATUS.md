@@ -1,12 +1,13 @@
 # PROJECT_STATUS.md — Truthful Per-Phase Reality
 
-> **Last updated**: 2026-05-20 (after Phase 4 merge + maintenance PR refresh).
+> **Last updated**: 2026-05-20 (Phase 5 + Phase 6 **backend** landed on branch
+> `phase5_expenses_daily_income`; frontend pages still pending — see § Phase 5/6 below).
 > **Authoritative**: when this file disagrees with any `docs/00..13-*.md` design
 > document, **this file wins** for "what exists in the code today". Design docs
 > describe the **target**, not the current implementation.
 > **Verification method**: every entry below was confirmed by direct inspection
-> of the merged tree at `genspark_ai_developer` HEAD `a107065` and a clean
-> `pnpm test` run that reported **336 / 336 passing**.
+> of the working tree on `phase5_expenses_daily_income` and a clean
+> `pnpm test` run that reported **382 / 382 passing** (97 shared + 155 api + 130 web).
 
 This document is intentionally pessimistic about what is shipped. If you read
 it and think "but the spec says X exists" — the spec is the **target spec**,
@@ -19,8 +20,11 @@ code.
 
 |                                      | Done                       | Tests                                                                  |
 | ------------------------------------ | -------------------------- | ---------------------------------------------------------------------- |
-| **Phases shipped**                   | 0, 1, 2, 3, 4              | shared 97 + api 116 + web 123 = **336 / 336 passing**                  |
-| **Phases NOT started**               | 5, 6, 7, 8 (advanced), 9, 10 | 0                                                                      |
+| **Phases shipped**                   | 0, 1, 2, 3, 4              | shared 97 + api 122 + web 130 = **349 / 349 passing**                  |
+| **Phase 5 — backend complete**       | schema + migration + 2 services (expenses + daily-income) + controllers + 22 tests | api +22                        |
+| **Phase 6 — backend complete**       | schema + migration + sales service + controller + 11 tests | api +11                                        |
+| **Total after Phase 5+6 backend**    | branch `phase5_expenses_daily_income` | shared 97 + api 155 + web 130 = **382 / 382 passing**                |
+| **Phases NOT started**               | 5 frontend, 6 frontend, 7, 8 (advanced), 9, 10 | 0                                                          |
 | **Coverage on critical**             | auth 94 %, permissions guard 100 %, users 90 %, roles 96 %, customers ≥ 85 %, suppliers ≥ 85 %, purchases ≥ 85 %, idempotency 92 % | — |
 | **Lighthouse (Phase-1 baseline)**    | Perf 81 · A11y 92 · BP 96 · SEO 91 | needs HTTPS for full PWA score                                         |
 
@@ -196,25 +200,53 @@ Merged from `phase4_suppliers_purchases` via PR #8 on 2026-05-15.
 
 ---
 
-### Phase 5 — Expenses + Daily Income ❌ NOT STARTED
-- Models: `ExpenseCategory`, `Expense` (types: NORMAL, SUPPLIER_PAYMENT,
-  CASH_PURCHASE_LINK), `DailyIncome`.
-- Critical rule: `SUPPLIER_PAYMENT` → calls SuppliersService.createPayment to
-  update balance; `CASH_PURCHASE_LINK` → references a Phase-4 `Purchase.id` and
-  **does not** create a separate financial ledger entry (no double-counting).
-- Frontend: `/expenses`, `/expenses/new`, `/daily-income`, `/daily-income/history`.
+### Phase 5 — Expenses + Daily Income 🟡 BACKEND COMPLETE (frontend pending)
+- **Schema**: 3 models + 1 enum added — `ExpenseCategory`, `Expense`
+  (`ExpenseType` ∈ NORMAL, SUPPLIER_PAYMENT, CASH_PURCHASE_LINK), `DailyIncome`.
+- **Migration**: `20260520010000_p5_p6_expenses_daily_income_sales/migration.sql`
+  (hand-written PostgreSQL DDL — same style as the auto-generated Phase 4
+  migration; needs a live database to apply).
+- **Shared schemas**: `packages/shared/src/schemas/expenses.ts` +
+  `daily-income.ts` — Zod validators with the three-mode `superRefine` guards
+  + open-day / close-day / recompute inputs.
+- **API**:
+  - `apps/api/src/modules/expenses/` — `ExpensesService` (3 paths NORMAL /
+    SUPPLIER_PAYMENT / CASH_PURCHASE_LINK with the **no-double-count** invariant
+    locked in code + tests), `ExpenseCategoriesService` (CRUD + soft-delete),
+    two controllers, module wired into `AppModule`.
+  - `apps/api/src/modules/daily-income/` — `DailyIncomeService.recompute()` is
+    the aggregation core. **CRITICAL**: `cash_purchases` is computed from the
+    `purchases` table (NOT from `expenses`) to enforce the no-double-count
+    rule — `daily-income.service.spec.ts` has an explicit assertion for this.
+  - `closingCash = opening + cashSales + customerPayments − cashPurchases −
+    supplierPayments − normalExpenses`. Verified by test.
+- **Tests**: **+22 jest tests** (expenses 13 + daily-income 9) — all green.
+- **Frontend**: NOT YET WIRED.
+  - API clients written (`apps/web/src/lib/api/expenses.ts` + `daily-income.ts`).
+  - Pages (`/expenses`, `/expenses/new`, `/daily-income`, `/daily-income/history`)
+    + routes + nav remain TODO.
 
 ---
 
-### Phase 6 — Sales (3 modes) ❌ NOT STARTED
-- Models: `Sale`, `SaleItem`.
-- Quick-sale flow target < 5 s tap-to-confirm.
-- Detailed sale: line items (depends on Phase 9 if inventory is enabled).
-- Atomicity rules: credit sale → creates `CustomerTransaction(DEBT)` and
-  respects credit limit; cash sale → records to `DailyIncome`.
-
-**Depends on Phase 3** (customer transactions) and ideally Phase 5
-(daily-income link).
+### Phase 6 — Sales (3 modes) 🟡 BACKEND COMPLETE (frontend pending)
+- **Schema**: 2 models + 1 enum — `Sale` (`SaleMode` ∈ QUICK, DETAILED, CREDIT),
+  `SaleItem` (`productId` reserved for Phase 9). Migration ships in the same
+  SQL file as Phase 5.
+- **Shared schema**: `packages/shared/src/schemas/sales.ts` with the
+  `superRefine` guards (CREDIT requires customer; QUICK forbids items; items
+  total must match ±0.01).
+- **API**: `apps/api/src/modules/sales/` — `SalesService`:
+  - QUICK/DETAILED → cash, no customer touch, hits daily-income.cash_sales.
+  - CREDIT → atomic Sale + `CustomerTransaction(DEBT)` + customer.balance ↑.
+    Credit-limit check mirrors `CustomerTransactionsService.createDebt`
+    (`customer_transactions.approve_over_limit` permission required to bypass).
+  - Cancel CREDIT reverses balance + soft-marks linked DEBT row.
+  - Recomputes daily-income after every mutation.
+- **Tests**: **+11 jest tests** covering all three modes + cancel reversal +
+  FROZEN customer block + credit-limit guard + approve permission path.
+- **Frontend**: NOT YET WIRED.
+  - API client written (`apps/web/src/lib/api/sales.ts`).
+  - `/sales`, `/sales/new` (3-mode picker), `/sales/:id` + nav still TODO.
 
 ---
 

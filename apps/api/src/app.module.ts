@@ -12,12 +12,15 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { configValidationSchema } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { DailyIncomeModule } from './modules/daily-income/daily-income.module';
+import { ExpensesModule } from './modules/expenses/expenses.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { SalesModule } from './modules/sales/sales.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -96,6 +99,13 @@ import { UsersModule } from './modules/users/users.module';
     // ─── Phase 4 ────────────────────────────────
     SuppliersModule,
     PurchasesModule,
+
+    // ─── Phase 5 ────────────────────────────────
+    DailyIncomeModule,
+    ExpensesModule,
+
+    // ─── Phase 6 ────────────────────────────────
+    SalesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

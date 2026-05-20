@@ -11,9 +11,12 @@
 export * from './auth';
 export * from './common';
 export * from './customers';
+export * from './daily-income';
+export * from './expenses';
 export * from './notifications';
 export * from './purchases';
 export * from './roles';
+export * from './sales';
 export * from './suppliers';
 export * from './users';
 
