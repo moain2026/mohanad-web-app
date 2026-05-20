@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Bell,
+  CalendarClock,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
@@ -66,6 +67,12 @@ const defaultItems: SidebarItem[] = [
     label: 'المصاريف',
     icon: Wallet,
     anyOf: ['expenses.view', 'expense_categories.view'],
+  },
+  {
+    to: '/daily-income',
+    label: 'إيرادات اليوم',
+    icon: CalendarClock,
+    permission: 'daily_income.view',
   },
   { to: '/reports', label: 'التقارير', icon: BarChart3, permission: 'reports.view' },
   { to: '/settings', label: 'الإعدادات', icon: Settings, permission: 'system.settings.view' },
