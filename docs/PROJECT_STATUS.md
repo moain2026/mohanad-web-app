@@ -1,13 +1,13 @@
 # PROJECT_STATUS.md — Truthful Per-Phase Reality
 
-> **Last updated**: 2026-05-20 (Phase 5 + Phase 6 **backend** landed on branch
-> `phase5_expenses_daily_income`; frontend pages still pending — see § Phase 5/6 below).
+> **Last updated**: 2026-05-20 (Phase 5 + Phase 6 **backend AND frontend**
+> shipped — branch `phase56_frontend_and_polish`).
 > **Authoritative**: when this file disagrees with any `docs/00..13-*.md` design
 > document, **this file wins** for "what exists in the code today". Design docs
 > describe the **target**, not the current implementation.
 > **Verification method**: every entry below was confirmed by direct inspection
-> of the working tree on `phase5_expenses_daily_income` and a clean
-> `pnpm test` run that reported **382 / 382 passing** (97 shared + 155 api + 130 web).
+> of the working tree on `phase56_frontend_and_polish` and a clean
+> `pnpm test` run that reported **401 / 401 passing** (97 shared + 155 api + 149 web).
 
 This document is intentionally pessimistic about what is shipped. If you read
 it and think "but the spec says X exists" — the spec is the **target spec**,
@@ -20,7 +20,7 @@ code.
 
 |                                      | Done                       | Tests                                                                  |
 | ------------------------------------ | -------------------------- | ---------------------------------------------------------------------- |
-| **Phases shipped**                   | 0, 1, 2, 3, 4              | shared 97 + api 122 + web 130 = **349 / 349 passing**                  |
+| **Phases shipped**                   | 0, 1, 2, 3, 4, 5, 6              | shared 97 + api 155 + web 149 = **401 / 401 passing**                  |
 | **Phase 5 — backend complete**       | schema + migration + 2 services (expenses + daily-income) + controllers + 22 tests | api +22                        |
 | **Phase 6 — backend complete**       | schema + migration + sales service + controller + 11 tests | api +11                                        |
 | **Total after Phase 5+6 backend**    | branch `phase5_expenses_daily_income` | shared 97 + api 155 + web 130 = **382 / 382 passing**                |
@@ -200,7 +200,7 @@ Merged from `phase4_suppliers_purchases` via PR #8 on 2026-05-15.
 
 ---
 
-### Phase 5 — Expenses + Daily Income 🟡 BACKEND COMPLETE (frontend pending)
+### Phase 5 — Expenses + Daily Income ✅ FULL STACK COMPLETE
 - **Schema**: 3 models + 1 enum added — `ExpenseCategory`, `Expense`
   (`ExpenseType` ∈ NORMAL, SUPPLIER_PAYMENT, CASH_PURCHASE_LINK), `DailyIncome`.
 - **Migration**: `20260520010000_p5_p6_expenses_daily_income_sales/migration.sql`
@@ -228,7 +228,7 @@ Merged from `phase4_suppliers_purchases` via PR #8 on 2026-05-15.
 
 ---
 
-### Phase 6 — Sales (3 modes) 🟡 BACKEND COMPLETE (frontend pending)
+### Phase 6 — Sales (3 modes) ✅ FULL STACK COMPLETE
 - **Schema**: 2 models + 1 enum — `Sale` (`SaleMode` ∈ QUICK, DETAILED, CREDIT),
   `SaleItem` (`productId` reserved for Phase 9). Migration ships in the same
   SQL file as Phase 5.
@@ -405,3 +405,60 @@ This is intentional — the seed assigns them to roles in advance.
    + smoke tests, capture screenshots, and update `knowledge-base/10-audit-report.md`.
 3. **Audit-log retention** — current rows live forever. Define a retention
    policy before Phase 8 archival cron is written.
+on** — current rows live forever. Define a retention
+   policy before Phase 8 archival cron is written.
+
+---
+
+## Phase 5 + 6 Frontend Addendum (2026-05-20)
+
+The frontend layer for Phases 5 and 6 was added on branch
+`phase56_frontend_and_polish`. Test totals updated to **401 / 401 passing**
+(97 shared + 155 api + 149 web).
+
+### Phase 5 Frontend — Expenses + Daily Income ✅
+- **Components** (`apps/web/src/components/expenses/`):
+  - `ExpenseTypeBadge.tsx` — 3-state badge (NORMAL/SUPPLIER_PAYMENT/CASH_PURCHASE_LINK).
+  - `ExpenseCard.tsx` — list-row card with type badge, amount, cancelled state.
+- **Pages** (`apps/web/src/pages/expenses/`):
+  - `ExpensesListPage.tsx` — filters (type/cancel) + pagination + permission-gated CTA.
+  - `NewExpensePage.tsx` — 3-mode picker form with conditional supplier/purchase pickers
+    and locked-rule info banner per mode.
+  - `ExpenseDetailPage.tsx` — read-only view + Cancel modal with mode-aware reversal
+    description + linked supplier/purchase navigation.
+  - `ExpenseCategoriesPage.tsx` — admin CRUD with create/edit modal + soft-delete.
+- **Daily Income pages** (`apps/web/src/pages/daily-income/`):
+  - `DailyIncomeTodayPage.tsx` — live snapshot, open/close/recompute actions,
+    7-row aggregates grid with no-double-count rule visualised.
+  - `DailyIncomeHistoryPage.tsx` — past days with from/to date filter + closed-only toggle.
+  - `DailyIncomeByDatePage.tsx` — read-only detail page for any historical day.
+- **Tests**: 8 vitest specs (ExpenseTypeBadge 3, ExpenseCard 5).
+- **Routes**: 7 new `<ProtectedRoute>` entries registered.
+- **Sidebar**: added "إيرادات اليوم" nav item (gated by `daily_income.view`).
+
+### Phase 6 Frontend — Sales (3 modes) ✅
+- **Components** (`apps/web/src/components/sales/`):
+  - `SaleModeBadge.tsx` — 3-state badge (QUICK/DETAILED/CREDIT).
+  - `SaleCard.tsx` — list-row card with mode badge + cash/customer label.
+  - `SaleItemsTable.tsx` — editable items table (unitPrice instead of unitCost).
+- **Pages** (`apps/web/src/pages/sales/`):
+  - `SalesListPage.tsx` — filters (mode/cancel) + pagination.
+  - `NewSalePage.tsx` — 3-mode picker with credit-limit pre-flight check:
+    - QUICK forbids items, no customer.
+    - DETAILED allows items (must reconcile ±0.01).
+    - CREDIT requires customer; computes balanceBefore + balanceAfter from
+      cached customer data; shows yellow warning when balanceAfter > creditLimit;
+      acknowledgement checkbox gated by `customer_transactions.approve_over_limit`
+      permission; server still re-validates and returns `CREDIT_LIMIT_EXCEEDED`
+      if the actor lacks the permission.
+  - `SaleDetailPage.tsx` — read-only view + items table + Cancel modal with
+    mode-aware reversal description + linked customer navigation.
+- **Tests**: 11 vitest specs (SaleModeBadge 3, SaleCard 5, SaleItemsTable 3).
+- **Routes**: 3 new `<ProtectedRoute>` entries registered.
+
+### Deferred follow-ups (out of this PR)
+- **Sessions UI**: backend `GET /auth/sessions` + `POST /auth/sessions/:id/revoke`
+  + frontend `<SessionsList />` component in `/account`.
+- **Idempotency GC**: `IdempotencyCleanerService.purgeExpired()` + CLI command for cron.
+- **Phases 7-10**: require live DB on Railway + real browser for E2E
+  (out of sandbox scope).

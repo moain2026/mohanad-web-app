@@ -78,6 +78,48 @@ const PurchaseDetailPage = lazy(() =>
   import('./pages/purchases/PurchaseDetailPage').then((m) => ({ default: m.PurchaseDetailPage })),
 );
 
+// Phase 5 — Expenses + Daily Income
+const ExpensesListPage = lazy(() =>
+  import('./pages/expenses/ExpensesListPage').then((m) => ({ default: m.ExpensesListPage })),
+);
+const NewExpensePage = lazy(() =>
+  import('./pages/expenses/NewExpensePage').then((m) => ({ default: m.NewExpensePage })),
+);
+const ExpenseDetailPage = lazy(() =>
+  import('./pages/expenses/ExpenseDetailPage').then((m) => ({ default: m.ExpenseDetailPage })),
+);
+const ExpenseCategoriesPage = lazy(() =>
+  import('./pages/expenses/ExpenseCategoriesPage').then((m) => ({
+    default: m.ExpenseCategoriesPage,
+  })),
+);
+const DailyIncomeTodayPage = lazy(() =>
+  import('./pages/daily-income/DailyIncomeTodayPage').then((m) => ({
+    default: m.DailyIncomeTodayPage,
+  })),
+);
+const DailyIncomeHistoryPage = lazy(() =>
+  import('./pages/daily-income/DailyIncomeHistoryPage').then((m) => ({
+    default: m.DailyIncomeHistoryPage,
+  })),
+);
+const DailyIncomeByDatePage = lazy(() =>
+  import('./pages/daily-income/DailyIncomeByDatePage').then((m) => ({
+    default: m.DailyIncomeByDatePage,
+  })),
+);
+
+// Phase 6 — Sales
+const SalesListPage = lazy(() =>
+  import('./pages/sales/SalesListPage').then((m) => ({ default: m.SalesListPage })),
+);
+const NewSalePage = lazy(() =>
+  import('./pages/sales/NewSalePage').then((m) => ({ default: m.NewSalePage })),
+);
+const SaleDetailPage = lazy(() =>
+  import('./pages/sales/SaleDetailPage').then((m) => ({ default: m.SaleDetailPage })),
+);
+
 /**
  * Application routes (React Router v5 — Q4 keeps v5 due to Ionic 8 lock).
  *
@@ -215,6 +257,57 @@ export function AppRoutes(): JSX.Element {
         component={PurchaseDetailPage}
         permission="purchases.view"
       />
+
+      {/* Phase 5 — Expenses */}
+      <ProtectedRoute
+        exact
+        path="/expenses"
+        component={ExpensesListPage}
+        permission="expenses.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/expenses/categories"
+        component={ExpenseCategoriesPage}
+        permission="expense_categories.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/expenses/new"
+        component={NewExpensePage}
+        permission="expenses.create"
+      />
+      <ProtectedRoute
+        exact
+        path="/expenses/:id"
+        component={ExpenseDetailPage}
+        permission="expenses.view"
+      />
+
+      {/* Phase 5 — Daily Income */}
+      <ProtectedRoute
+        exact
+        path="/daily-income"
+        component={DailyIncomeTodayPage}
+        permission="daily_income.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/daily-income/history"
+        component={DailyIncomeHistoryPage}
+        permission="daily_income.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/daily-income/:date"
+        component={DailyIncomeByDatePage}
+        permission="daily_income.view"
+      />
+
+      {/* Phase 6 — Sales */}
+      <ProtectedRoute exact path="/sales" component={SalesListPage} permission="sales.view" />
+      <ProtectedRoute exact path="/sales/new" component={NewSalePage} permission="sales.create" />
+      <ProtectedRoute exact path="/sales/:id" component={SaleDetailPage} permission="sales.view" />
 
       <Route component={NotFoundPage} />
     </Switch>
