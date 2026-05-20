@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { ResponseFormatInterceptor } from './common/interceptors/response-format.interceptor';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
@@ -82,6 +83,8 @@ import { UsersModule } from './modules/users/users.module';
     // JwtModule registered globally so middleware (IdempotencyMiddleware)
     // can decode access tokens to scope the cache to the correct user.
     JwtModule.register({ global: true }),
+    // Provides IdempotencyCleanerService (used by CLI + future cron).
+    IdempotencyModule,
 
     // ─── Foundation feature modules ─────────────
     HealthModule,
