@@ -40,6 +40,7 @@ import {
 
 import type { CancelPurchaseInput, CreatePurchaseInput, ListPurchasesQuery } from '@grocery/shared';
 
+import { writeAuditLog } from '../../common/audit/audit.helper';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface PurchaseScope {
@@ -190,20 +191,18 @@ export class PurchasesService {
         });
       }
 
-      // d) Audit log.
-      await db.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'create',
-          entityType: 'purchase',
-          entityId: purchase.id,
-          newValues: {
-            supplierId: input.supplierId,
-            paymentType: input.paymentType,
-            totalAmount: total,
-            hasItems: purchase.hasItems,
-          },
+      // d) Audit log (via shared helper — uniform shape across services).
+      await writeAuditLog(db, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'create',
+        entityType: 'purchase',
+        entityId: purchase.id,
+        newValues: {
+          supplierId: input.supplierId,
+          paymentType: input.paymentType,
+          totalAmount: total,
+          hasItems: purchase.hasItems,
         },
       });
 
@@ -273,20 +272,18 @@ export class PurchasesService {
         });
       }
 
-      // c) Audit log.
-      await db.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'cancel',
-          entityType: 'purchase',
-          entityId: id,
-          oldValues: {
-            paymentType: purchase.paymentType,
-            totalAmount: purchase.totalAmount,
-          },
-          newValues: { reason: input.reason },
+      // c) Audit log (via shared helper).
+      await writeAuditLog(db, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'cancel',
+        entityType: 'purchase',
+        entityId: id,
+        oldValues: {
+          paymentType: purchase.paymentType,
+          totalAmount: String(purchase.totalAmount),
         },
+        newValues: { reason: input.reason },
       });
 
       return updated;

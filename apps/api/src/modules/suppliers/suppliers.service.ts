@@ -28,6 +28,7 @@ import {
 
 import type { CreateSupplierInput, ListSuppliersQuery, UpdateSupplierInput } from '@grocery/shared';
 
+import { writeAuditLog } from '../../common/audit/audit.helper';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface SupplierScope {
@@ -181,17 +182,15 @@ export class SuppliersService {
           },
         });
       }
-      await tx.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'create',
-          entityType: 'supplier',
-          entityId: supplier.id,
-          newValues: {
-            name: supplier.name,
-            openingBalance: opening,
-          },
+      await writeAuditLog(tx, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'create',
+        entityType: 'supplier',
+        entityId: supplier.id,
+        newValues: {
+          name: supplier.name,
+          openingBalance: opening,
         },
       });
       return supplier;
@@ -215,16 +214,14 @@ export class SuppliersService {
           ...(input.notes !== undefined ? { notes: input.notes ?? null } : {}),
         },
       });
-      await tx.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'update',
-          entityType: 'supplier',
-          entityId: id,
-          oldValues: { name: before.name, phone: before.phone },
-          newValues: { ...input },
-        },
+      await writeAuditLog(tx, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'update',
+        entityType: 'supplier',
+        entityId: id,
+        oldValues: { name: before.name, phone: before.phone },
+        newValues: { ...input },
       });
     });
     return this.findOne(scope, id);
@@ -244,14 +241,12 @@ export class SuppliersService {
         where: { id },
         data: { deletedAt: new Date(), isActive: false },
       });
-      await tx.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'delete',
-          entityType: 'supplier',
-          entityId: id,
-        },
+      await writeAuditLog(tx, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'delete',
+        entityType: 'supplier',
+        entityId: id,
       });
     });
     return { ok: true };
@@ -279,14 +274,12 @@ export class SuppliersService {
         where: { id },
         data: { deletedAt: null, isActive: true },
       });
-      await tx.auditLog.create({
-        data: {
-          storeId: scope.storeId,
-          actorId: scope.actorId,
-          action: 'restore',
-          entityType: 'supplier',
-          entityId: id,
-        },
+      await writeAuditLog(tx, {
+        storeId: scope.storeId,
+        actorId: scope.actorId,
+        action: 'restore',
+        entityType: 'supplier',
+        entityId: id,
       });
     });
     return this.findOne(scope, id);
