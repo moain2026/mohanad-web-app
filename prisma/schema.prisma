@@ -60,6 +60,18 @@ model Store {
   // Phase 6 relations
   sales Sale[]
 
+  // Phase 7 relations
+  reportSnapshots ReportSnapshot[]
+
+  // Phase 8 relations
+  notificationTemplates  NotificationTemplate[]
+  scheduledJobs          ScheduledJob[]
+  customerBehaviorAlerts CustomerBehaviorAlert[]
+
+  // Phase 9 relations
+  products       Product[]
+  stockMovements StockMovement[]
+
   @@map("stores")
 }
 
@@ -130,6 +142,20 @@ model User {
   // Phase 6 relations
   salesCreated   Sale[] @relation("SaleCreatedBy")
   salesCancelled Sale[] @relation("SaleCancelledBy")
+
+  // Phase 7 relations
+  reportSnapshotsCreated ReportSnapshot[] @relation("ReportSnapshotCreatedBy")
+
+  // Phase 8 relations
+  templatesCreated NotificationTemplate[] @relation("TemplateCreatedBy")
+  templatesUpdated NotificationTemplate[] @relation("TemplateUpdatedBy")
+  passwordResets   PasswordResetToken[]
+
+  // Phase 9 relations
+  productsCreated         Product[]       @relation("ProductCreatedBy")
+  productsUpdated         Product[]       @relation("ProductUpdatedBy")
+  stockMovementsCreated   StockMovement[] @relation("StockMovementCreatedBy")
+  stockMovementsCancelled StockMovement[] @relation("StockMovementCancelledBy")
 
   @@index([storeId])
   @@index([isActive])
@@ -321,6 +347,9 @@ model Customer {
 
   // Phase 6 relations
   sales Sale[]
+
+  // Phase 8 relations
+  behaviorAlerts CustomerBehaviorAlert[]
 
   @@index([storeId])
   @@index([status])
@@ -797,6 +826,224 @@ model SaleItem {
   @@index([saleId])
   @@index([productId])
   @@map("sale_items")
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CUSTOMER (Phase 3 cont.) — needs reverse rel for Phase 8 alerts
+// ═══════════════════════════════════════════════════════════════
+// (Customer model defined above — alert relation registered via @@relation)
+
+// ═══════════════════════════════════════════════════════════════
+//  REPORTS — Phase 7 (P7-1)
+// ═══════════════════════════════════════════════════════════════
+
+/// Cached snapshot of an expensive report (P&L, monthly summary, etc).
+/// Used to make printed/exported reports reproducible at a point in time
+/// and to short-circuit recompute for "frozen" reports referenced by id.
+/// Reports themselves are computed on-the-fly by ReportsService — this
+/// table is purely a cache + audit trail of "what did this report say on D".
+model ReportSnapshot {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  reportType     String   @map("report_type") // "daily_summary" | "profit_loss" | ...
+  parametersJson Json     @map("parameters_json") // {from, to, ...} for reproducibility
+  resultJson     Json     @map("result_json")
+  createdById    String   @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  store     Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("ReportSnapshotCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([storeId, reportType, createdAt])
+  @@index([createdById])
+  @@map("report_snapshots")
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NOTIFICATION TEMPLATES — Phase 8 (P8-1)
+// ═══════════════════════════════════════════════════════════════
+
+/// WhatsApp / internal notification template.
+/// `bodyTemplate` uses {{placeholders}} substituted by NotificationsService.
+/// Allowed placeholders are listed in `placeholdersJson` for the UI.
+model NotificationTemplate {
+  id               String              @id @default(cuid())
+  storeId          String              @map("store_id")
+  key              String // unique per store, e.g. "monthly_reminder", "debt_high"
+  name             String
+  channel          NotificationChannel
+  bodyTemplate     String              @map("body_template")
+  placeholdersJson Json                @map("placeholders_json") // string[] of allowed keys
+  isActive         Boolean             @default(true) @map("is_active")
+  isSystem         Boolean             @default(false) @map("is_system")
+  createdById      String              @map("created_by_id")
+  updatedById      String?             @map("updated_by_id")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  store     Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("TemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User? @relation("TemplateUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, key])
+  @@index([storeId, isActive])
+  @@map("notification_templates")
+}
+
+enum NotificationChannel {
+  INTERNAL
+  WHATSAPP
+}
+
+/// Audit trail of scheduled cron job runs.
+/// One row per (jobKey, runAt) — lets the dashboard show "last reminder run"
+/// and prevents accidental double-execution if a job crashes mid-flight.
+model ScheduledJob {
+  id         String             @id @default(cuid())
+  storeId    String             @map("store_id")
+  jobKey     String             @map("job_key") // "customer_monthly_reminders" | "behavior_analysis" | "idempotency_cleanup"
+  status     ScheduledJobStatus @default(RUNNING)
+  startedAt  DateTime           @default(now()) @map("started_at")
+  finishedAt DateTime?          @map("finished_at")
+  error      String?
+  resultJson Json?              @map("result_json")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, jobKey, startedAt])
+  @@index([status])
+  @@map("scheduled_jobs")
+}
+
+enum ScheduledJobStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+/// Customer behavior alert — generated nightly by analysis cron.
+/// Powers the dashboard "اعملاء يحتاجون متابعة" widget without recomputing.
+model CustomerBehaviorAlert {
+  id         String        @id @default(cuid())
+  storeId    String        @map("store_id")
+  customerId String        @map("customer_id")
+  alertType  String        @map("alert_type") // "inactive_30d" | "debt_aging_60d" | "near_credit_limit" | ...
+  severity   AlertSeverity @default(INFO)
+  message    String
+  metadata   Json?
+  resolvedAt DateTime?     @map("resolved_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, customerId, alertType])
+  @@index([storeId, severity, resolvedAt])
+  @@index([customerId])
+  @@map("customer_behavior_alerts")
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+/// One-time password reset token (Phase 8).
+/// Stored as SHA-256 hash; original token is emailed/whatsapp'd to the user.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INVENTORY (OPTIONAL) — Phase 9
+// ═══════════════════════════════════════════════════════════════
+
+/// Inventory item. Enabled only when `Setting{key:"inventory.enabled"} = true`.
+/// `currentStock` is denormalised from StockMovement for fast reads.
+/// All mutations go through prisma.$transaction with row-locking.
+model Product {
+  id           String  @id @default(cuid())
+  storeId      String  @map("store_id")
+  sku          String?
+  name         String
+  unit         String  @default("piece")
+  category     String?
+  currentStock Decimal @default(0) @map("current_stock") @db.Decimal(14, 2)
+  reorderLevel Decimal @default(0) @map("reorder_level") @db.Decimal(14, 2)
+  costPrice    Decimal @default(0) @map("cost_price") @db.Decimal(14, 2)
+  sellPrice    Decimal @default(0) @map("sell_price") @db.Decimal(14, 2)
+  isActive     Boolean @default(true) @map("is_active")
+
+  createdById String    @map("created_by_id")
+  updatedById String?   @map("updated_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User?           @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  movements StockMovement[]
+
+  @@unique([storeId, sku])
+  @@index([storeId, isActive])
+  @@index([storeId, name])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+/// Immutable ledger of stock changes.
+/// IN  → +quantity (purchases, manual adjustments)
+/// OUT → −quantity (sales, write-offs)
+/// ADJUST → signed quantity (positive or negative)
+model StockMovement {
+  id          String            @id @default(cuid())
+  storeId     String            @map("store_id")
+  productId   String            @map("product_id")
+  type        StockMovementType
+  quantity    Decimal           @db.Decimal(14, 2)
+  stockBefore Decimal           @map("stock_before") @db.Decimal(14, 2)
+  stockAfter  Decimal           @map("stock_after") @db.Decimal(14, 2)
+  notes       String?
+
+  referenceType String? @map("reference_type") // "sale" | "purchase" | "adjustment"
+  referenceId   String? @map("reference_id")
+
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  store       Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy   User    @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy User?   @relation("StockMovementCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([productId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([cancelledAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
 }
 
 // ═══════════════════════════════════════════════════════════════
