@@ -3,6 +3,7 @@ import {
   Bell,
   LayoutDashboard,
   type LucideIcon,
+  Package,
   Receipt,
   Truck,
   Users,
@@ -63,6 +64,12 @@ const defaultItems: BottomNavItem[] = [
     label: 'المصاريف',
     icon: Wallet,
     anyOf: ['expenses.view', 'expense_categories.manage'],
+  },
+  {
+    to: '/inventory',
+    label: 'المخزون',
+    icon: Package,
+    anyOf: ['inventory.view', 'products.view'],
   },
   {
     to: '/notifications',

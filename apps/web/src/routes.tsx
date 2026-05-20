@@ -120,6 +120,46 @@ const SaleDetailPage = lazy(() =>
   import('./pages/sales/SaleDetailPage').then((m) => ({ default: m.SaleDetailPage })),
 );
 
+// Phase 7 — Reports + Settings
+const ReportsListPage = lazy(() =>
+  import('./pages/reports/ReportsListPage').then((m) => ({ default: m.ReportsListPage })),
+);
+const ReportDetailPage = lazy(() =>
+  import('./pages/reports/ReportDetailPage').then((m) => ({ default: m.ReportDetailPage })),
+);
+const SettingsPage = lazy(() =>
+  import('./pages/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+
+// Phase 8 — Templates + Password Reset
+const NotificationTemplatesPage = lazy(() =>
+  import('./pages/admin/NotificationTemplatesPage').then((m) => ({
+    default: m.NotificationTemplatesPage,
+  })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })),
+);
+
+// Phase 9 — Products + Inventory
+const ProductsListPage = lazy(() =>
+  import('./pages/products/ProductsListPage').then((m) => ({ default: m.ProductsListPage })),
+);
+const ProductFormPage = lazy(() =>
+  import('./pages/products/ProductFormPage').then((m) => ({ default: m.ProductFormPage })),
+);
+const ProductDetailPage = lazy(() =>
+  import('./pages/products/ProductDetailPage').then((m) => ({ default: m.ProductDetailPage })),
+);
+const InventoryPage = lazy(() =>
+  import('./pages/inventory/InventoryPage').then((m) => ({ default: m.InventoryPage })),
+);
+const StockMovementFormPage = lazy(() =>
+  import('./pages/inventory/StockMovementFormPage').then((m) => ({
+    default: m.StockMovementFormPage,
+  })),
+);
+
 /**
  * Application routes (React Router v5 — Q4 keeps v5 due to Ionic 8 lock).
  *
@@ -139,6 +179,7 @@ export function AppRoutes(): JSX.Element {
     <Switch>
       <Route exact path="/" render={() => <Redirect to="/login" />} />
       <Route exact path="/login" component={LoginPage} />
+      <Route exact path="/forgot-password" component={ForgotPasswordPage} />
       <ProtectedRoute exact path="/dashboard" component={DashboardPage} />
 
       {/* Admin */}
@@ -308,6 +349,100 @@ export function AppRoutes(): JSX.Element {
       <ProtectedRoute exact path="/sales" component={SalesListPage} permission="sales.view" />
       <ProtectedRoute exact path="/sales/new" component={NewSalePage} permission="sales.create" />
       <ProtectedRoute exact path="/sales/:id" component={SaleDetailPage} permission="sales.view" />
+
+      {/* Phase 7 — Reports */}
+      <ProtectedRoute
+        exact
+        path="/reports"
+        component={ReportsListPage}
+        anyOf={[
+          'reports.dashboard.view',
+          'reports.daily_summary.view',
+          'reports.monthly_summary.view',
+          'reports.profit_loss.view',
+          'reports.cash_flow.view',
+          'reports.customer_debts.view',
+          'reports.supplier_debts.view',
+          'reports.sales.view',
+          'reports.expenses.view',
+          'reports.inventory.view',
+        ]}
+      />
+      <ProtectedRoute
+        exact
+        path="/reports/:type"
+        component={ReportDetailPage}
+        anyOf={[
+          'reports.dashboard.view',
+          'reports.daily_summary.view',
+          'reports.monthly_summary.view',
+          'reports.profit_loss.view',
+          'reports.cash_flow.view',
+          'reports.customer_debts.view',
+          'reports.supplier_debts.view',
+          'reports.sales.view',
+          'reports.expenses.view',
+          'reports.inventory.view',
+        ]}
+      />
+
+      {/* Phase 7 — Settings */}
+      <ProtectedRoute
+        exact
+        path="/settings"
+        component={SettingsPage}
+        permission="system.settings.view"
+      />
+
+      {/* Phase 8 — Notification Templates */}
+      <ProtectedRoute
+        exact
+        path="/admin/templates"
+        component={NotificationTemplatesPage}
+        permission="notifications.manage_templates"
+      />
+
+      {/* Phase 9 — Products + Inventory */}
+      <ProtectedRoute
+        exact
+        path="/products"
+        component={ProductsListPage}
+        permission="products.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/products/new"
+        component={ProductFormPage}
+        permission="products.create"
+      />
+      <ProtectedRoute
+        exact
+        path="/products/:id"
+        component={ProductDetailPage}
+        permission="products.view"
+      />
+      <ProtectedRoute
+        exact
+        path="/products/:id/edit"
+        component={ProductFormPage}
+        permission="products.update"
+      />
+      <ProtectedRoute
+        exact
+        path="/inventory"
+        component={InventoryPage}
+        anyOf={['inventory.view', 'products.view']}
+      />
+      <ProtectedRoute
+        exact
+        path="/stock-movements/new"
+        component={StockMovementFormPage}
+        anyOf={[
+          'stock_movements.create_in',
+          'stock_movements.create_out',
+          'stock_movements.adjust',
+        ]}
+      />
 
       <Route component={NotFoundPage} />
     </Switch>

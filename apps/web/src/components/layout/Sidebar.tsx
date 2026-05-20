@@ -1,10 +1,14 @@
 import {
+  BarChart3,
   Bell,
   CalendarClock,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
+  MessageSquare,
+  Package,
   Receipt,
+  Settings,
   ShieldCheck,
   ShoppingCart,
   Truck,
@@ -72,6 +76,32 @@ const defaultItems: SidebarItem[] = [
     icon: CalendarClock,
     permission: 'daily_income.view',
   },
+  // ─── Reports + Inventory (Phases 7, 9) ───
+  {
+    to: '/reports',
+    label: 'التقارير',
+    icon: BarChart3,
+    sectionLabel: 'التقارير والمخزون',
+    anyOf: [
+      'reports.dashboard.view',
+      'reports.daily_summary.view',
+      'reports.monthly_summary.view',
+      'reports.profit_loss.view',
+      'reports.cash_flow.view',
+    ],
+  },
+  {
+    to: '/inventory',
+    label: 'المخزون',
+    icon: Package,
+    anyOf: ['inventory.view', 'products.view'],
+  },
+  {
+    to: '/products',
+    label: 'المنتجات',
+    icon: Package,
+    permission: 'products.view',
+  },
   // ─── Admin section ───
   {
     to: '/admin/users',
@@ -81,6 +111,18 @@ const defaultItems: SidebarItem[] = [
     sectionLabel: 'الإدارة',
   },
   { to: '/admin/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck, permission: 'roles.view' },
+  {
+    to: '/admin/templates',
+    label: 'قوالب الإشعارات',
+    icon: MessageSquare,
+    permission: 'notifications.manage_templates',
+  },
+  {
+    to: '/settings',
+    label: 'الإعدادات',
+    icon: Settings,
+    permission: 'system.settings.view',
+  },
   // ─── Account ───
   { to: '/account', label: 'حسابي', icon: UserCircle, sectionLabel: 'الحساب' },
   {
