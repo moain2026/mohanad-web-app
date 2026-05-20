@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "cli:purge-idempotency": "nest start --entryFile cli/purge-idempotency",
+    "cli:purge-idempotency:prod": "node dist/cli/purge-idempotency.js"
   },
   "dependencies": {
     "@grocery/shared": "workspace:*",
