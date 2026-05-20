@@ -12,19 +12,26 @@
 
 ## الحالة الحالية
 
-| المرحلة | الوصف                                          | الحالة                |
-| ------- | ---------------------------------------------- | --------------------- |
-| 0       | التحليل والتوثيق                               | ✅ مكتمل (`docs/00..12`) |
-| **1**   | **Foundation (Monorepo + Schema + Shells)**    | ✅ **مكتمل**           |
-| 2       | Auth + RBAC                                    | ⏳                    |
-| 3       | Customers + Debts                              | ⏳                    |
-| 4       | Suppliers + Purchases                          | ⏳                    |
-| 5       | Expenses + Daily Income                        | ⏳                    |
-| 6       | Sales Modes                                    | ⏳                    |
-| 7       | Reports                                        | ⏳                    |
-| 8       | Notifications + WhatsApp                       | ⏳                    |
-| 9       | Inventory (optional)                           | ⏳                    |
-| 10      | Polish + PWA + Deployment                      | ⏳                    |
+> **آخر تحديث**: 2026-05-20 — الـ source of truth الموثوق:
+> [`docs/PROJECT_STATUS.md`](./docs/PROJECT_STATUS.md) و
+> [`docs/AGENT_HANDOFF.md`](./docs/AGENT_HANDOFF.md).
+
+| المرحلة | الوصف                                          | الحالة          |
+| ------- | ---------------------------------------------- | --------------- |
+| 0       | التحليل والتوثيق                               | ✅ مكتمل        |
+| 1       | Foundation (Monorepo + Schema + Shells)        | ✅ مكتمل        |
+| 2       | Auth + RBAC (181 permissions, 6 roles)         | ✅ مكتمل        |
+| 3       | Customers + Debts + Notifications + WhatsApp   | ✅ مكتمل        |
+| 4       | Suppliers + Purchases (Cash + Credit)          | ✅ مكتمل        |
+| **5**   | **Expenses + Daily Income**                    | ⏳ **التالي**   |
+| 6       | Sales Modes                                    | ⏳              |
+| 7       | Reports                                        | ⏳              |
+| 8       | Notifications-advanced + Cron + Templates      | ⏳              |
+| 9       | Inventory (optional)                           | ⏳              |
+| 10      | Polish + PWA + Deployment + E2E                | ⏳              |
+
+**اختبارات اليوم**: 336 / 336 خضراء (shared 97 · api 116 · web 123).
+**Prisma models**: 18 · **Migrations**: 3 · **Permissions**: 181 / 19 modules.
 
 ## بنية المشروع (Monorepo — pnpm workspaces)
 
@@ -91,7 +98,13 @@ pnpm dev
 
 ## التوثيق
 
-راجع مجلد [`docs/`](./docs):
+> **اقرأ أولاً** (Source of Truth الحالي):
+> - [`docs/AGENT_HANDOFF.md`](./docs/AGENT_HANDOFF.md) — 10 دقائق onboarding للجلسة الجديدة
+> - [`docs/PROJECT_STATUS.md`](./docs/PROJECT_STATUS.md) — حالة كل مرحلة بدقّة
+> - [`docs/MASTER_PLAN.md`](./docs/MASTER_PLAN.md) — خطّة الـ PR الحالي
+> - [`docs/12-agent-memory.md`](./docs/12-agent-memory.md) — القرارات المُقفلة
+
+راجع مجلد [`docs/`](./docs) للتوثيق التصميمي الكامل:
 
 - [`00-project-overview.md`](./docs/00-project-overview.md)
 - [`01-requirements-analysis.md`](./docs/01-requirements-analysis.md)

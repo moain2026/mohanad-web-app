@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   BarChart3,
+  Bell,
   Boxes,
   LayoutDashboard,
   type LucideIcon,
@@ -79,6 +80,12 @@ const defaultItems: BottomNavItem[] = [
     anyOf: ['expenses.view', 'expense_categories.view'],
   },
   { to: '/reports', label: 'التقارير', icon: BarChart3, permission: 'reports.view' },
+  {
+    to: '/notifications',
+    label: 'الإشعارات',
+    icon: Bell,
+    permission: 'notifications.view_own',
+  },
 ];
 
 export function BottomNav({
