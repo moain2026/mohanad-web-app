@@ -54,6 +54,7 @@ const buildPrismaMock = () => ({
   },
   refreshToken: {
     updateMany: jest.fn(),
+    findMany: jest.fn(),
   },
   $transaction: jest.fn(),
 });
@@ -338,6 +339,118 @@ describe('AuthService', () => {
       } as any);
       expect(r.revoked).toBe(3);
       expect(bcrypt.hash).toHaveBeenCalledWith('New@12345', 12);
+    });
+  });
+
+  // ─── listSessions ──────────────────────────────────────────
+  describe('listSessions', () => {
+    it('returns active sessions sorted DESC with `current` flagged via cookie hash', async () => {
+      // Hash of literal "refresh-cookie-raw" — we let the service compute it
+      // (it uses sha256 from token.service which is the real impl), and we
+      // align the mocked row's tokenHash with that hash for one of two rows.
+      const { sha256 } = await import('../token.service');
+      const rawCookie = 'refresh-cookie-raw-token';
+      const currentHash = sha256(rawCookie);
+
+      const now = new Date();
+      prisma.refreshToken.findMany.mockResolvedValue([
+        {
+          id: 'rt-cur',
+          tokenHash: currentHash,
+          deviceLabel: 'iPhone 15',
+          ipAddress: '1.2.3.4',
+          userAgent: 'Mozilla/5.0',
+          rememberMe: true,
+          createdAt: now,
+          expiresAt: new Date(now.getTime() + 7 * 86400_000),
+        },
+        {
+          id: 'rt-other',
+          tokenHash: 'other-hash',
+          deviceLabel: null,
+          ipAddress: null,
+          userAgent: null,
+          rememberMe: false,
+          createdAt: new Date(now.getTime() - 1000),
+          expiresAt: new Date(now.getTime() + 86400_000),
+        },
+      ]);
+
+      const out = await service.listSessions('user-1', rawCookie);
+
+      expect(prisma.refreshToken.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 'user-1',
+            revokedAt: null,
+            expiresAt: expect.objectContaining({ gt: expect.any(Date) }),
+          }),
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+      expect(out).toHaveLength(2);
+      expect(out[0]).toMatchObject({ id: 'rt-cur', current: true, deviceLabel: 'iPhone 15' });
+      expect(out[1]).toMatchObject({ id: 'rt-other', current: false });
+      // ISO strings, never Date objects
+      expect(typeof out[0].createdAt).toBe('string');
+      expect(typeof out[0].expiresAt).toBe('string');
+    });
+
+    it('flags no row as `current` when no refresh cookie is provided', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([
+        {
+          id: 'rt-1',
+          tokenHash: 'h1',
+          deviceLabel: null,
+          ipAddress: null,
+          userAgent: null,
+          rememberMe: false,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 86400_000),
+        },
+      ]);
+      const out = await service.listSessions('user-1', null);
+      expect(out[0].current).toBe(false);
+    });
+
+    it('returns empty array when no active sessions exist', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([]);
+      const out = await service.listSessions('user-1', 'whatever');
+      expect(out).toEqual([]);
+    });
+  });
+
+  // ─── revokeSession ─────────────────────────────────────────
+  describe('revokeSession', () => {
+    it('revokes a session owned by the user', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+      const result = await service.revokeSession('user-1', 'rt-1');
+      expect(result).toEqual({ revoked: true });
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { id: 'rt-1', userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it('throws 404 SESSION_NOT_FOUND when row does not exist / not owned / already revoked', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.revokeSession('user-1', 'rt-x')).rejects.toMatchObject({
+        status: 404,
+        response: { code: 'SESSION_NOT_FOUND' },
+      });
+    });
+
+    it('cannot revoke another user`s session — scoping is enforced via updateMany WHERE', async () => {
+      // Even if the attacker passes a real session id from another user,
+      // the WHERE clause filters by `userId` so updateMany returns count=0,
+      // which then surfaces as 404.
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.revokeSession('attacker', 'victim-session-id')).rejects.toMatchObject({
+        response: { code: 'SESSION_NOT_FOUND' },
+      });
+      // Confirm the scoping was indeed applied
+      const callArgs = prisma.refreshToken.updateMany.mock.calls[0][0];
+      expect(callArgs.where.userId).toBe('attacker');
     });
   });
 });

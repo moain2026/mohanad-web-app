@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useHistory } from 'react-router-dom';
 
+import { SessionsList } from '@/components/account/SessionsList';
 import { AppShell } from '@/components/layout/AppShell';
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -229,6 +230,9 @@ export function AccountPage(): JSX.Element {
             </form>
           </Card>
         </motion.div>
+
+        {/* ─── Active sessions list ─── */}
+        <SessionsList />
 
         {/* ─── Security: logout-all ─── */}
         <motion.div
