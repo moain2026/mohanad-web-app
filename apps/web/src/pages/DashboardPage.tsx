@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
+  Bell,
   CheckCircle2,
   CircleDollarSign,
+  Package,
   Plus,
   Receipt,
   TrendingUp,
@@ -13,6 +15,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 
 import { QuickActionCard } from '@/components/dashboard/QuickActionCard';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -23,6 +26,7 @@ import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { t } from '@/i18n/ar';
 import { http } from '@/lib/http';
+import { reportsApi } from '@/lib/api/reports';
 import { formatMoney } from '@grocery/shared';
 
 interface HealthPayload {
@@ -43,20 +47,15 @@ async function fetchHealth(): Promise<HealthPayload> {
   return res.data.data;
 }
 
-const sample = {
-  income: [12, 18, 15, 24, 22, 30, 38, 36, 42, 48, 52, 58],
-  expenses: [4, 6, 5, 8, 7, 10, 12, 11, 14, 13, 15, 16],
-  net: [8, 12, 10, 16, 15, 20, 26, 25, 28, 35, 37, 42],
-  debts: [40, 38, 41, 39, 37, 35, 34, 32, 31, 30, 29, 28],
-};
+function num(v: unknown): number {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') return Number(v) || 0;
+  return 0;
+}
 
 /**
  * DashboardPage — landing screen after login.
- *
- *   • 4 KPI StatCards with sparklines + 3D tilt
- *   • Live system health card driven by /api/v1/health
- *   • 4 QuickActionCards (auto-animated grid)
- *   • Stagger-in animation via Framer Motion
+ * Phase 7: KPIs are now wired to the real `/reports/dashboard` endpoint.
  */
 export function DashboardPage(): JSX.Element {
   const quickActionsRef = useRef<HTMLDivElement>(null);
@@ -75,53 +74,74 @@ export function DashboardPage(): JSX.Element {
     refetchInterval: 30_000,
   });
 
+  const {
+    data: dash,
+    isLoading: dashLoading,
+    isError: dashError,
+  } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: () => reportsApi.dashboard(),
+    refetchInterval: 60_000,
+  });
+
+  // Build sparkline series from last 7 days
+  const sparkSales = dash?.charts.last7Days.map((d) => num(d.sales)) ?? [];
+  const sparkExpenses = dash?.charts.last7Days.map((d) => num(d.expenses)) ?? [];
+  const sparkNet = dash?.charts.last7Days.map((d) => num(d.net)) ?? [];
+  // Debt sparkline isn't tracked daily — use a flat series at current level
+  const currentDebt = num(dash?.customers.totalDebt ?? 0);
+  const sparkDebts = sparkSales.map(() => currentDebt);
+
   const stats = [
     {
       label: t('dashboard.todayIncome'),
-      value: formatMoney(48250),
-      delta: '+12.4%',
+      value: formatMoney(num(dash?.today.salesTotal ?? 0)),
+      delta: dash ? `${dash.today.salesCount} عملية` : '—',
       trend: 'up' as const,
       icon: TrendingUp,
-      series: sample.income,
+      series: sparkSales,
     },
     {
       label: t('dashboard.todayExpenses'),
-      value: formatMoney(12480),
-      delta: '+3.2%',
+      value: formatMoney(num(dash?.today.expenses ?? 0)),
+      delta: dash ? `الصندوق: ${formatMoney(num(dash.today.closingCash))}` : '—',
       trend: 'up' as const,
       icon: Wallet,
       iconClassName: 'bg-amber-50 text-amber-700',
-      series: sample.expenses,
+      series: sparkExpenses,
     },
     {
       label: t('dashboard.netProfit'),
-      value: formatMoney(35770),
-      delta: '+18.1%',
+      value: formatMoney(num(dash?.today.netProfit ?? 0)),
+      delta: dash ? `الشهر: ${formatMoney(num(dash.month.netProfit))}` : '—',
       trend: 'up' as const,
       icon: CircleDollarSign,
       iconClassName: 'bg-green-50 text-green-700',
-      series: sample.net,
+      series: sparkNet,
     },
     {
       label: t('dashboard.customersWithDebt'),
-      value: '28',
-      delta: '-4.0%',
+      value: String(dash?.customers.withDebt ?? 0),
+      delta: dash ? `إجمالي الديون: ${formatMoney(currentDebt)}` : '—',
       trend: 'down' as const,
       icon: Users,
       iconClassName: 'bg-blue-50 text-blue-700',
-      series: sample.debts,
+      series: sparkDebts,
     },
   ];
+
+  const lowStockCount = dash?.inventory.lowStockCount ?? 0;
+  const unreadNotifs = dash?.notifications.unread ?? 0;
 
   return (
     <AppShell title={t('dashboard.title')}>
       <PageHeader
         eyebrow={t('app.name')}
         title={t('dashboard.title')}
-        description="نظرة سريعة على أداء البقالة اليوم — كل القيم بالعملة المحلية (YER)."
+        description="نظرة سريعة على أداء البقالة اليوم — كل القيم من قاعدة البيانات مباشرة."
         actions={
           <Badge variant="primary" icon={<CheckCircle2 className="h-3.5 w-3.5" />}>
-            Foundation v0.1.0
+            v0.7.0 — Reports Live
           </Badge>
         }
       />
@@ -136,19 +156,73 @@ export function DashboardPage(): JSX.Element {
           show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
         }}
         className="mt-6 grid grid-cols-1 sm:grid-cols-2 desktop:grid-cols-4 gap-4"
+        data-testid="dashboard-kpis"
       >
-        {stats.map((s) => (
-          <motion.div
-            key={s.label}
-            variants={{
-              hidden: { opacity: 0, y: 12 },
-              show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } },
-            }}
-          >
-            <StatCard {...s} />
-          </motion.div>
-        ))}
+        {dashLoading
+          ? ['s0', 's1', 's2', 's3'].map((k) => <Skeleton key={k} className="h-32 w-full" />)
+          : dashError
+            ? (
+              <div className="col-span-full">
+                <Card>
+                  <div className="flex items-start gap-3 text-sm text-rose-700">
+                    <AlertTriangle className="h-5 w-5 mt-0.5" />
+                    <p>تعذَّر تحميل مؤشرات الأداء. تأكَّد من أن الـ API يعمل.</p>
+                  </div>
+                </Card>
+              </div>
+            )
+            : stats.map((s) => (
+                <motion.div
+                  key={s.label}
+                  variants={{
+                    hidden: { opacity: 0, y: 12 },
+                    show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } },
+                  }}
+                >
+                  <StatCard {...s} />
+                </motion.div>
+              ))}
       </motion.section>
+
+      {/* Alerts strip */}
+      {(lowStockCount > 0 || unreadNotifs > 0) && dash ? (
+        <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2" data-testid="dashboard-alerts">
+          {lowStockCount > 0 ? (
+            <Link to="/inventory" className="block">
+              <Card className="border-amber-200 bg-amber-50/50 hover:bg-amber-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
+                    <Package className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800">مخزون منخفض</p>
+                    <p className="text-xs text-amber-700">
+                      {lowStockCount} منتج بحاجة إلى إعادة الطلب
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          ) : null}
+          {unreadNotifs > 0 ? (
+            <Link to="/notifications" className="block">
+              <Card className="border-blue-200 bg-blue-50/50 hover:bg-blue-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-800">إشعارات جديدة</p>
+                    <p className="text-xs text-blue-700">
+                      {unreadNotifs} إشعار لم يُقرأ بعد
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Health + Quick actions */}
       <section className="mt-8 grid grid-cols-1 desktop:grid-cols-3 gap-4">

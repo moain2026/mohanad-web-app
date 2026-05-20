@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Lock, ShieldCheck, Sparkles, Store, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useHistory, useLocation } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -198,11 +198,13 @@ export function LoginPage(): JSX.Element {
                   />
                   {t('login.rememberMe')}
                 </label>
-                {/*
-                  "نسيت كلمة المرور" is intentionally hidden until the password-reset
-                  endpoint ships (currently scheduled with the Phase 8 notifications
-                  work). Showing a button that only fires a toast was confusing.
-                */}
+                <Link
+                  to="/forgot-password"
+                  className="text-primary-700 hover:underline"
+                  data-testid="forgot-password-link"
+                >
+                  نسيت كلمة المرور؟
+                </Link>
               </div>
 
               {/* Lockout countdown banner */}

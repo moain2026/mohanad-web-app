@@ -16,12 +16,19 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { DailyIncomeModule } from './modules/daily-income/daily-income.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { HealthModule } from './modules/health/health.module';
+import { NotificationTemplatesModule } from './modules/notification-templates/notification-templates.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PasswordResetsModule } from './modules/password-resets/password-resets.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { ProductsModule } from './modules/products/products.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { SalesModule } from './modules/sales/sales.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -109,6 +116,19 @@ import { UsersModule } from './modules/users/users.module';
 
     // ─── Phase 6 ────────────────────────────────
     SalesModule,
+
+    // ─── Phase 7 (Reports + Settings) ───────────
+    SettingsModule,
+    ReportsModule,
+
+    // ─── Phase 8 (Templates + Password Reset + Scheduler) ─
+    NotificationTemplatesModule,
+    PasswordResetsModule,
+    SchedulerModule,
+
+    // ─── Phase 9 (Inventory — optional but always loaded) ─
+    ProductsModule,
+    StockMovementsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
