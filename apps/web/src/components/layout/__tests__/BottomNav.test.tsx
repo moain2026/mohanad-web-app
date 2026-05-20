@@ -3,9 +3,13 @@
  *
  * Verifies dynamic-tab filtering by permissions:
  *   • Sales Worker  → sees only the tabs whose permission set matches.
- *   • Owner (181 perms) → sees up to `max` tabs (default 5), with the
- *     surplus collapsed into a "More" entry.
+ *   • Owner (181 perms) → sees up to `max` tabs (default 5).
  *   • Unauthenticated → only the no-permission tabs (dashboard).
+ *
+ * NOTE: As of the 2026-05-20 nav cleanup, the BottomNav only references
+ * routes that actually exist in the app (no `/reports`, `/inventory`, or
+ * `/more` placeholders) since Phase 7 (reports) and Phase 9 (inventory)
+ * are not yet implemented.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -57,25 +61,24 @@ describe('BottomNav', () => {
     renderNav();
     expect(screen.getByText('الرئيسية')).toBeInTheDocument();
     expect(screen.queryByText('المبيعات')).not.toBeInTheDocument();
-    expect(screen.queryByText('التقارير')).not.toBeInTheDocument();
+    expect(screen.queryByText('المصاريف')).not.toBeInTheDocument();
   });
 
-  it('Sales Worker sees sales/customers but NOT reports/expenses', () => {
-    login(['SalesWorker'], ['sales.view', 'sales.create', 'customers.view', 'products.view']);
+  it('Sales Worker sees sales/customers but NOT expenses/purchases', () => {
+    login(['SalesWorker'], ['sales.view', 'sales.create', 'customers.view']);
     renderNav();
     expect(screen.getByText('الرئيسية')).toBeInTheDocument();
     expect(screen.getByText('المبيعات')).toBeInTheDocument();
     expect(screen.getByText('العملاء')).toBeInTheDocument();
-    expect(screen.queryByText('التقارير')).not.toBeInTheDocument();
     expect(screen.queryByText('المصاريف')).not.toBeInTheDocument();
+    expect(screen.queryByText('المشتريات')).not.toBeInTheDocument();
   });
 
-  it('Accountant sees expenses + reports but not sales/customers', () => {
-    login(['Accountant'], ['expenses.view', 'reports.view']);
+  it('Accountant sees expenses but not sales/customers', () => {
+    login(['Accountant'], ['expenses.view']);
     renderNav();
     expect(screen.getByText('الرئيسية')).toBeInTheDocument();
     expect(screen.getByText('المصاريف')).toBeInTheDocument();
-    expect(screen.getByText('التقارير')).toBeInTheDocument();
     expect(screen.queryByText('المبيعات')).not.toBeInTheDocument();
     expect(screen.queryByText('العملاء')).not.toBeInTheDocument();
   });
@@ -88,21 +91,20 @@ describe('BottomNav', () => {
         'sales.create',
         'customers.view',
         'expenses.view',
-        'inventory.view',
         'purchases.view',
-        'reports.view',
+        'suppliers.view',
+        'notifications.view_own',
       ],
     );
     renderNav();
     const links = screen.getAllByRole('link');
     expect(links.length).toBeLessThanOrEqual(5);
-    // The overflow "More" entry should appear since the user qualifies
-    // for more than the cap.
-    expect(screen.getByText('المزيد')).toBeInTheDocument();
+    // First tab is always Dashboard
+    expect(screen.getByText('الرئيسية')).toBeInTheDocument();
   });
 
   it('respects a custom `max` prop', () => {
-    login(['Owner'], ['sales.view', 'customers.view', 'expenses.view', 'reports.view']);
+    login(['Owner'], ['sales.view', 'customers.view', 'expenses.view']);
     renderNav({ max: 3 });
     const links = screen.getAllByRole('link');
     expect(links.length).toBeLessThanOrEqual(3);

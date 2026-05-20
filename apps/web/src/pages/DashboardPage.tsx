@@ -21,7 +21,6 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useToast } from '@/components/ui/Toast';
 import { t } from '@/i18n/ar';
 import { http } from '@/lib/http';
 import { formatMoney } from '@grocery/shared';
@@ -60,7 +59,6 @@ const sample = {
  *   • Stagger-in animation via Framer Motion
  */
 export function DashboardPage(): JSX.Element {
-  const toast = useToast();
   const quickActionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -202,28 +200,28 @@ export function DashboardPage(): JSX.Element {
               description="بيع نقدي سريع"
               icon={Receipt}
               tone="primary"
-              onClick={() => toast.info('سيُفعَّل في المرحلة 6 (Sales)')}
+              to="/sales/new"
             />
             <QuickActionCard
               label={t('dashboard.addDebt')}
               description="تسجيل دين على عميل"
               icon={Plus}
               tone="warning"
-              onClick={() => toast.info('سيُفعَّل في المرحلة 3 (Customers)')}
+              to="/customers"
             />
             <QuickActionCard
               label={t('dashboard.recordPayment')}
               description="استلام سداد"
               icon={CircleDollarSign}
               tone="success"
-              onClick={() => toast.info('سيُفعَّل في المرحلة 3 (Customers)')}
+              to="/customers"
             />
             <QuickActionCard
               label={t('dashboard.addExpense')}
               description="تسجيل مصروف يومي"
               icon={UserPlus}
               tone="info"
-              onClick={() => toast.info('سيُفعَّل في المرحلة 5 (Expenses)')}
+              to="/expenses/new"
             />
           </div>
         </div>

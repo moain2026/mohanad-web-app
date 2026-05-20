@@ -1,11 +1,8 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3,
   Bell,
-  Boxes,
   LayoutDashboard,
   type LucideIcon,
-  MoreHorizontal,
   Receipt,
   Truck,
   Users,
@@ -46,12 +43,6 @@ export interface BottomNavProps {
   max?: number;
 }
 
-const MORE_TAB: BottomNavItem = {
-  to: '/more',
-  label: 'المزيد',
-  icon: MoreHorizontal,
-};
-
 const defaultItems: BottomNavItem[] = [
   { to: '/dashboard', label: 'الرئيسية', icon: LayoutDashboard },
   { to: '/sales', label: 'المبيعات', icon: Receipt, anyOf: ['sales.view', 'sales.create'] },
@@ -60,12 +51,6 @@ const defaultItems: BottomNavItem[] = [
     label: 'العملاء',
     icon: Users,
     anyOf: ['customers.view', 'customer_transactions.view'],
-  },
-  {
-    to: '/inventory',
-    label: 'المخزون',
-    icon: Boxes,
-    anyOf: ['inventory.view', 'products.view'],
   },
   {
     to: '/purchases',
@@ -77,9 +62,8 @@ const defaultItems: BottomNavItem[] = [
     to: '/expenses',
     label: 'المصاريف',
     icon: Wallet,
-    anyOf: ['expenses.view', 'expense_categories.view'],
+    anyOf: ['expenses.view', 'expense_categories.manage'],
   },
-  { to: '/reports', label: 'التقارير', icon: BarChart3, permission: 'reports.view' },
   {
     to: '/notifications',
     label: 'الإشعارات',
@@ -109,12 +93,8 @@ export function BottomNav({
     });
   }, [items, isAuthenticated, hasPermission, hasAnyPermission, hasAllPermissions]);
 
-  // Always reserve the last slot for the "More" overflow tab.
-  const displayed = useMemo<BottomNavItem[]>(() => {
-    const reserved = max - 1;
-    const head = visible.slice(0, reserved);
-    return [...head, MORE_TAB];
-  }, [visible, max]);
+  // Cap the rendered set at `max` entries.
+  const displayed = useMemo<BottomNavItem[]>(() => visible.slice(0, max), [visible, max]);
 
   return (
     <nav

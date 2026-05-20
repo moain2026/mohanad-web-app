@@ -198,13 +198,11 @@ export function LoginPage(): JSX.Element {
                   />
                   {t('login.rememberMe')}
                 </label>
-                <button
-                  type="button"
-                  className="text-primary-700 hover:text-primary-800"
-                  onClick={() => toast.info('سيتم تفعيل استعادة كلمة المرور لاحقاً')}
-                >
-                  {t('login.forgotPassword')}
-                </button>
+                {/*
+                  "نسيت كلمة المرور" is intentionally hidden until the password-reset
+                  endpoint ships (currently scheduled with the Phase 8 notifications
+                  work). Showing a button that only fires a toast was confusing.
+                */}
               </div>
 
               {/* Lockout countdown banner */}

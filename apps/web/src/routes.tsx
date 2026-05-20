@@ -269,7 +269,7 @@ export function AppRoutes(): JSX.Element {
         exact
         path="/expenses/categories"
         component={ExpenseCategoriesPage}
-        permission="expense_categories.view"
+        permission="expenses.view"
       />
       <ProtectedRoute
         exact

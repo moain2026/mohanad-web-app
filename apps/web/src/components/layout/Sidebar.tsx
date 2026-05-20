@@ -1,12 +1,10 @@
 import {
-  BarChart3,
   Bell,
   CalendarClock,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
   Receipt,
-  Settings,
   ShieldCheck,
   ShoppingCart,
   Truck,
@@ -66,7 +64,7 @@ const defaultItems: SidebarItem[] = [
     to: '/expenses',
     label: 'المصاريف',
     icon: Wallet,
-    anyOf: ['expenses.view', 'expense_categories.view'],
+    anyOf: ['expenses.view', 'expense_categories.manage'],
   },
   {
     to: '/daily-income',
@@ -74,8 +72,6 @@ const defaultItems: SidebarItem[] = [
     icon: CalendarClock,
     permission: 'daily_income.view',
   },
-  { to: '/reports', label: 'التقارير', icon: BarChart3, permission: 'reports.view' },
-  { to: '/settings', label: 'الإعدادات', icon: Settings, permission: 'system.settings.view' },
   // ─── Admin section ───
   {
     to: '/admin/users',
