@@ -107,4 +107,16 @@ describe('BottomNav', () => {
     const links = screen.getAllByRole('link');
     expect(links.length).toBeLessThanOrEqual(3);
   });
+
+  it('exposes Notifications tab to a user with notifications.view_own (max=8)', () => {
+    login(['Viewer'], ['notifications.view_own']);
+    renderNav({ max: 8 });
+    expect(screen.getByText('الإشعارات')).toBeInTheDocument();
+  });
+
+  it('hides Notifications tab from a user without notifications.view_own', () => {
+    login(['Viewer'], ['sales.view']);
+    renderNav({ max: 8 });
+    expect(screen.queryByText('الإشعارات')).not.toBeInTheDocument();
+  });
 });

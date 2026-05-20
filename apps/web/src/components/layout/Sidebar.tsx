@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
@@ -79,6 +80,12 @@ const defaultItems: SidebarItem[] = [
   { to: '/admin/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck, permission: 'roles.view' },
   // ─── Account ───
   { to: '/account', label: 'حسابي', icon: UserCircle, sectionLabel: 'الحساب' },
+  {
+    to: '/notifications',
+    label: 'الإشعارات',
+    icon: Bell,
+    permission: 'notifications.view_own',
+  },
 ];
 
 export function Sidebar({ items = defaultItems, onLogout, className }: SidebarProps): JSX.Element {
