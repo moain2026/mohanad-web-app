@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Req,
   Res,
@@ -33,12 +34,14 @@ const REFRESH_COOKIE_NAME = 'grocery_refresh';
  *    memory + Authorization header). Never set as a cookie.
  *
  * Endpoints:
- *   POST /auth/login            — public, sets refresh cookie
- *   POST /auth/refresh          — public (but cookie-gated), rotates token
- *   POST /auth/logout           — auth, revokes current session
- *   POST /auth/logout-all       — auth, revokes all sessions for the user
- *   GET  /auth/me               — auth, returns current user profile
- *   POST /auth/change-password  — auth, revokes all sessions
+ *   POST /auth/login                   — public, sets refresh cookie
+ *   POST /auth/refresh                 — public (but cookie-gated), rotates token
+ *   POST /auth/logout                  — auth, revokes current session
+ *   POST /auth/logout-all              — auth, revokes all sessions for the user
+ *   GET  /auth/me                      — auth, returns current user profile
+ *   POST /auth/change-password         — auth, revokes all sessions
+ *   GET  /auth/sessions                — auth, lists current user's active sessions
+ *   POST /auth/sessions/:id/revoke     — auth, revokes a single session by id
  */
 @ApiTags('Auth')
 @Controller('auth')
@@ -215,6 +218,52 @@ export class AuthController {
   @ApiOperation({ summary: 'بيانات المستخدم الحالي + صلاحياته' })
   me(@CurrentUser() user: AuthUser): AuthUser {
     return user;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  GET /auth/sessions
+  //  → list active sessions (refresh tokens) for current user.
+  // ═══════════════════════════════════════════════════════════
+  @Get('sessions')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'قائمة الجلسات النشطة للمستخدم الحالي' })
+  async listSessions(
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ): Promise<{
+    sessions: Array<{
+      id: string;
+      deviceLabel: string | null;
+      ipAddress: string | null;
+      userAgent: string | null;
+      rememberMe: boolean;
+      createdAt: string;
+      expiresAt: string;
+      current: boolean;
+    }>;
+  }> {
+    const cookies = (req as Request & { cookies?: Record<string, string> }).cookies ?? {};
+    const currentRaw = cookies[REFRESH_COOKIE_NAME] ?? null;
+    const sessions = await this.auth.listSessions(user.id, currentRaw);
+    return { sessions };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  POST /auth/sessions/:id/revoke
+  //  → revoke a single session by id (must belong to current user).
+  //  Uses POST (not DELETE) so the request goes through the
+  //  IdempotencyMiddleware naturally.
+  // ═══════════════════════════════════════════════════════════
+  @Post('sessions/:id/revoke')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'إنهاء جلسة محددة' })
+  async revokeSession(
+    @CurrentUser() user: AuthUser,
+    @Param('id') sessionId: string,
+  ): Promise<{ ok: true; revoked: true }> {
+    const result = await this.auth.revokeSession(user.id, sessionId);
+    return { ok: true, ...result };
   }
 
   // ═══════════════════════════════════════════════════════════

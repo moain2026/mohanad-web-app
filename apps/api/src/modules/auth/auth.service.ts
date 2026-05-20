@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -317,6 +318,92 @@ export class AuthService {
   async logoutAll(userId: string): Promise<{ revoked: number }> {
     const revoked = await this.tokens.revokeAllForUser(userId);
     return { revoked };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  SESSIONS — list / revoke individual
+  // ═══════════════════════════════════════════════════════════
+  /**
+   * List the current user's ACTIVE sessions
+   * (non-revoked AND non-expired refresh tokens).
+   *
+   * The `current` flag is true for the row whose `tokenHash` matches the
+   * SHA-256 of the caller's refresh cookie. If the caller didn't send a
+   * refresh cookie (e.g. cookies were lost between subdomains), every row
+   * is reported as non-current and the UI can still display them.
+   *
+   * Sorted by `createdAt` DESC so the most recent session is at the top.
+   * Returns plain serialisable shape (Dates → ISO strings).
+   */
+  async listSessions(
+    userId: string,
+    currentRawRefreshToken: string | null,
+  ): Promise<
+    Array<{
+      id: string;
+      deviceLabel: string | null;
+      ipAddress: string | null;
+      userAgent: string | null;
+      rememberMe: boolean;
+      createdAt: string;
+      expiresAt: string;
+      current: boolean;
+    }>
+  > {
+    const currentHash = currentRawRefreshToken ? sha256(currentRawRefreshToken) : null;
+    const rows = await this.prisma.refreshToken.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tokenHash: true,
+        deviceLabel: true,
+        ipAddress: true,
+        userAgent: true,
+        rememberMe: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      deviceLabel: r.deviceLabel,
+      ipAddress: r.ipAddress,
+      userAgent: r.userAgent,
+      rememberMe: r.rememberMe,
+      createdAt: r.createdAt.toISOString(),
+      expiresAt: r.expiresAt.toISOString(),
+      current: currentHash !== null && r.tokenHash === currentHash,
+    }));
+  }
+
+  /**
+   * Revoke a single session (refresh token row) belonging to the current
+   * user. Always uses `updateMany` scoped to `{ id, userId, revokedAt: null }`
+   * so a user can NEVER revoke another user's session, even by crafting the
+   * request payload.
+   *
+   *  • Row not found, or already revoked, or belongs to another user
+   *    → 404 SESSION_NOT_FOUND (uniform — never leaks existence).
+   *  • Otherwise marks `revokedAt = now`. On the next refresh attempt the
+   *    affected session is rejected with `REFRESH_TOKEN_REVOKED`.
+   */
+  async revokeSession(userId: string, sessionId: string): Promise<{ revoked: true }> {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: { id: sessionId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException({
+        message: 'الجلسة غير موجودة أو تم إنهاؤها مسبقاً',
+        code: 'SESSION_NOT_FOUND',
+      });
+    }
+    return { revoked: true };
   }
 
   // ═══════════════════════════════════════════════════════════

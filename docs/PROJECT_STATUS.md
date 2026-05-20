@@ -1,13 +1,59 @@
 # PROJECT_STATUS.md — Truthful Per-Phase Reality
 
-> **Last updated**: 2026-05-20 (Phase 5 + Phase 6 **backend AND frontend**
-> shipped — branch `phase56_frontend_and_polish`).
+> **Last updated**: 2026-05-20 (Phase 5 + Phase 6 **backend AND frontend** shipped;
+> **Sessions UI** added — branch `sessions_and_idempotency_gc`).
 > **Authoritative**: when this file disagrees with any `docs/00..13-*.md` design
 > document, **this file wins** for "what exists in the code today". Design docs
 > describe the **target**, not the current implementation.
 > **Verification method**: every entry below was confirmed by direct inspection
-> of the working tree on `phase56_frontend_and_polish` and a clean
-> `pnpm test` run that reported **401 / 401 passing** (97 shared + 155 api + 149 web).
+> of the working tree and a clean `pnpm test` run that reported
+> **407 / 407 passing** (97 shared + 161 api + 149 web).
+
+## Phase 2 polish addendum — Sessions UI (2026-05-20)
+
+The original Phase 2 ships /auth/logout-all but no per-session management.
+This patch adds the missing pieces (server + UI) and lays the groundwork for
+the idempotency-key garbage collector (still pending — see § Pending).
+
+**Backend** (`apps/api`):
+- `AuthService.listSessions(userId, currentRawRefreshToken)` — returns ALL
+  non-revoked, non-expired `RefreshToken` rows for the user, sorted DESC,
+  with a `current` flag computed by comparing `sha256(cookie)` against
+  `tokenHash` (no raw token ever leaves the server).
+- `AuthService.revokeSession(userId, sessionId)` — `updateMany` scoped to
+  `{ id, userId, revokedAt: null }`. Returns 404 `SESSION_NOT_FOUND` when
+  the row doesn't exist, was already revoked, or belongs to another user
+  (uniform — never leaks existence).
+- `AuthController` endpoints:
+  - `GET /auth/sessions` → `{ sessions: AuthSession[] }`
+  - `POST /auth/sessions/:id/revoke` → `{ ok: true, revoked: true }`
+- **+6 jest tests** in `apps/api/src/modules/auth/__tests__/auth.service.spec.ts`
+  covering: current-flag matching, no-cookie case, empty-list, successful
+  revoke, 404 on missing / already-revoked, and the cross-user scoping check.
+
+**Frontend** (`apps/web`):
+- `apps/web/src/lib/api/auth.ts` — typed `authApi.listSessions()` /
+  `authApi.revokeSession(id)`.
+- `apps/web/src/components/account/SessionsList.tsx` — React-Query driven
+  list with: light UA-string parser (device icon + browser label),
+  "هذا الجهاز" badge for the current session (revoke disabled on it —
+  use Logout for that), per-row revoke button with `<ConfirmDialog>`,
+  manual refresh button, empty/error/loading states, and full RTL styling.
+- Inserted between change-password and security cards in
+  `apps/web/src/pages/AccountPage.tsx`.
+
+### Pending — Idempotency GC (NOT YET STARTED)
+- `apps/api/src/common/idempotency/idempotency-cleaner.service.ts` with
+  `purgeExpired()` (delete WHERE `expiresAt < now`).
+- Register in `AppModule` providers.
+- CLI command `apps/api/src/cli/purge-idempotency.ts` + npm script for cron.
+- Jest tests for the cleaner.
+
+### Pending — SessionsList vitest spec
+- Tests for SessionsList have **not** been authored yet (needs a
+  React-Query test wrapper since none exists in the repo today).
+- All other code is lint-clean, typecheck-clean, and existing
+  407/407 tests pass.
 
 This document is intentionally pessimistic about what is shipped. If you read
 it and think "but the spec says X exists" — the spec is the **target spec**,
